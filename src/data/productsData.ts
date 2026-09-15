@@ -1,5 +1,17 @@
-import PrimeHwhite from '../assets/Hwhite.jpg';
-import CCBaseImg from '../assets/CC.jpg';
+import PrimeHwhite from './product_img/PrimeH.png';
+import CCBaseImg from './product_img/CC.png';
+import NONPVC from './product_img/NONPVC.png';
+import Phthalate from './product_img/Phthalate.jpeg';
+import FoilGel from './product_img/FoilGel.jpeg';
+import Glitter from './product_img/Glitter.png';
+import HDGel from './product_img/HDGel.png';
+import FoamGel from './product_img/FoamGel.jpeg';
+import Metallic from './product_img/Mettalic.png';
+import litho from './product_img/Litho.png';
+import transfer from './product_img/transfer.png';
+import Craft1 from './product_img/Craft1.png';
+import Craft2 from './product_img/Craft2.png';
+import Craft3 from './product_img/Craft3.jpeg';
 
 // Category Banner Images matching exact disk extensions (.jpeg, .jpg, .webp)
 import waterBaseBanner from './categories/water based ink texture macro.jpeg';
@@ -234,7 +246,7 @@ export const productsData: Product[] = [
     longDesc:
       'Engineered specifically to satisfy tier-1 multinational athletic brand Restricted Substance Lists (RSL), Chemtech Acrysol eliminates 100% of PVC and ortho-phthalates. It mimics plastisol ink mechanics: it will not dry or skin in the screen mesh during shift breaks, yet glides effortlessly through fine meshes with pseudoplastic shear-thinning flow. Yields up to 250% elongation with rapid tensile recovery on spandex activewear.',
     image:
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+      NONPVC,
     badge: '100% Free from PVC',
     accentColor: 'var(--accent-teal)',
     pdfUrl: '/assets/pdfs/non-pvc-acrysol.pdf', // [PLACEHOLDER]: Client to provide non-pvc-acrysol.pdf
@@ -280,7 +292,7 @@ export const productsData: Product[] = [
     longDesc:
       'Chemtech Phthalate-Free Plastisol is formulated with premium dispersion-grade vinyl copolymers and bio-based ester plasticizers. Designed for 24/7 high-speed automatic presses, the ink stays indefinitely open in the screen without skinning or viscosity drift. Delivers brilliant light reflectance on dark fabrics, high tensile stretch recovery, and superior resistance to abrasion and industrial laundering.',
     image:
-      'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80',
+      Phthalate,
     badge: 'High Opacity & Durability',
     accentColor: 'var(--accent-purple)',
     pdfUrl: '/assets/pdfs/phthalate-free-plastisol.pdf', // [PLACEHOLDER]: Client to provide phthalate-free-plastisol.pdf
@@ -326,7 +338,7 @@ export const productsData: Product[] = [
     longDesc:
       'Chemtech Foil Gel is engineered to form an unbreakable bond with hot-stamp metallized polyester films. Printed through coarse mesh counts, it lays down a smooth, uniform wet deposit that cures into an aggressive thermal adhesive. Prevents foil flaking, perimeter haloing, or post-wash peeling, providing luxury fashion garments with high-luster mirrored finishes.',
     image:
-      'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80',
+      FoilGel,
     badge: 'Luxurious Finish',
     accentColor: 'var(--accent-gold)',
     pdfUrl: '/assets/pdfs/foil-gel.pdf', // [PLACEHOLDER]: Client to provide foil-gel.pdf
@@ -367,7 +379,7 @@ export const productsData: Product[] = [
     longDesc:
       'Formulated with high optical clarity, Chemtech Glitter Gel encapsulates metallic and holographic polyester flakes without milky discoloration. The polymer binder secures each flake within the deposit matrix, preventing prickly surface textures or fallout in the laundry while maximizing multi-angle sparkle reflection.',
     image:
-      'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=800&q=80',
+      Glitter,
     badge: 'Multi-Dimension',
     accentColor: 'var(--accent-orange)',
     pdfUrl: '/assets/pdfs/glitter-gel.pdf', // [PLACEHOLDER]: Client to provide glitter-gel.pdf
@@ -408,7 +420,7 @@ export const productsData: Product[] = [
     longDesc:
       'Chemtech HD Gel is an extra-heavy structural paste designed to be pushed through thick capillary film stencils (200–400 microns). It retains its crisp, vertical 90-degree square edges throughout tunnel heat exposure without slumping, rounding, or sagging. Can be printed glossy clear as a silicone-look accent, or tinted with pigments for bold rubberized lettering.',
     image:
-      'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=800&q=80',
+      HDGel,
     badge: 'Sharp Definition',
     accentColor: 'var(--primary-color)',
     pdfUrl: '/assets/pdfs/hd-gel.pdf', // [PLACEHOLDER]: Client to provide hd-gel.pdf
@@ -449,7 +461,7 @@ export const productsData: Product[] = [
     longDesc:
       'Formulated with calibrated gas-filled micro-spheres, Chemtech Foam Gel expands by up to 300% upon reaching 150°C. Creates luxurious embossed finishes with a spongy, suede-like touch. Engineered to expand uniformly across both fine lines and solid blocks without pitting, pinholing, or premature deflation.',
     image:
-      'https://images.unsplash.com/photo-1579783928621-7a13d66a62d1?auto=format&fit=crop&w=800&q=80',
+      FoamGel,
     badge: '3D Raised Puff',
     accentColor: 'var(--accent-red)',
     pdfUrl: '/assets/pdfs/foam-gel.pdf', // [PLACEHOLDER]: Client to provide foam-gel.pdf
@@ -488,7 +500,7 @@ export const productsData: Product[] = [
     shortDesc:
       'Formulated with non-tarnishing bronze and aluminum leafing flakes. Delivers radiant gold, silver, bronze, and copper lustre with outstanding wash durability.',
     image:
-      'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=800&q=80',
+      Metallic,
     longDesc:
       'Chemtech Metallic Inks utilize surface-passivated alloy flakes that resist oxidation, dulling, and tarnishing under high dryer heat and repeated wash cycles. Available in Rich Gold, Pale Gold, Radiant Silver, and Antique Copper, these inks glide effortlessly through meshes up to 77T without clogging.',
     badge: 'Eye-Catching Shine',
@@ -535,7 +547,7 @@ export const productsData: Product[] = [
     longDesc:
       'Litho Backup White serves as the solid white reflective foundation for reverse-printed heat transfers on PET films and release papers. It seals printed detail colors, prevents substrate dye migration on dyed synthetics, and provides an ideal bonding surface for hot-melt adhesive powders and gels.',
     image:
-      'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1000&q=80',
+      litho,
     badge: 'Heat Transfer System',
     accentColor: 'var(--accent-gold)',
     pdfUrl: '/assets/pdfs/litho-backup-white.pdf', // [PLACEHOLDER]: Client to provide litho-backup-white.pdf
@@ -576,7 +588,7 @@ export const productsData: Product[] = [
     longDesc:
       'Chemtech Transfer Adhesive Gel is a printable polyurethane-copolyester bonding vehicle available in four distinct grades: Liquid Gel (standard cotton), Transfer Clear (translucent fabrics), Lycra Gel (high-stretch spandex), and Thermoline Adhesive Gel (industrial wash workwear). Applies cleanly through screens with sharp edges and zero powder scatter.',
     image:
-      'https://images.unsplash.com/photo-1607344645866-009c320c5ab8?auto=format&fit=crop&w=1000&q=80',
+      transfer,
     badge: '4 Formulations',
     accentColor: 'var(--accent-gold)',
     pdfUrl: '/assets/pdfs/transfer-adhesive-gel.pdf', // [PLACEHOLDER]: Client to provide transfer-adhesive-gel.pdf
@@ -621,7 +633,7 @@ export const productsData: Product[] = [
     longDesc:
       'Craft Ink Fabric Textile Base solves the primary challenge of manual hand-table screen printing: premature ink drying in the mesh openings. Formulated with humectant moisture retainers, it stays fluid in screens for up to 30 minutes without misting or clogging. Cleans up with tap water and cures easily with a standard household dry iron.',
     image:
-      'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1000&q=80',
+      Craft1,
     badge: 'Table Printing Base',
     accentColor: 'var(--accent-orange)',
     pdfUrl: '/assets/pdfs/craft-ink-fabric-textile-base.pdf', // [PLACEHOLDER]: Client to provide craft-fabric-base.pdf
@@ -662,7 +674,7 @@ export const productsData: Product[] = [
     longDesc:
       'Designed for boutique apparel makers and manual screen printing studios, Craft Ink Opaque White delivers striking single-stroke coverage on dark fabrics. Yields a smooth, flexible matte white finish that never feels plastic or rigid, and holds fine typographic edges without bleed.',
     image:
-      'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1000&q=80',
+      Craft2,
     badge: 'Dark Fabric Coverage',
     accentColor: 'var(--primary-color)',
     pdfUrl: '/assets/pdfs/craft-ink-opaque-white.pdf', // [PLACEHOLDER]: Client to provide craft-opaque-white.pdf
@@ -703,7 +715,7 @@ export const productsData: Product[] = [
     longDesc:
       'Craft Ink Shimmer Base adds subtle opalescence and pearl gleam to textiles, stationery, and art prints. Suspended with micro-fine mineral mica, it produces an eye-catching luster that shifts with lighting angles while feeling silky and non-abrasive against skin.',
     image:
-      'https://images.unsplash.com/photo-1516962215378-7fa2e137ae93?auto=format&fit=crop&w=1000&q=80',
+      Craft3,
     badge: 'Pearl Shimmer',
     accentColor: 'var(--accent-gold)',
     pdfUrl: '/assets/pdfs/craft-ink-shimmer-base.pdf', // [PLACEHOLDER]: Client to provide craft-shimmer-base.pdf
