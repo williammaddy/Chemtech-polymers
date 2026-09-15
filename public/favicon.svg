@@ -1,0 +1,30 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="fav-c-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3D4EB3" />
+      <stop offset="100%" stop-color="#2B3A8F" />
+    </linearGradient>
+  </defs>
+  <!-- 5 Colored Accent Dots arched over top -->
+  <circle cx="16" cy="11" r="3.2" fill="#F37021" />
+  <circle cx="24" cy="7.5" r="3.2" fill="#ED1C24" />
+  <circle cx="32" cy="6" r="3.2" fill="#92278F" />
+  <circle cx="40" cy="7.5" r="3.2" fill="#00A896" />
+  <circle cx="48" cy="11" r="3.2" fill="#FBB03B" />
+
+  <!-- Stylized C Icon Mark: Thick circular open arc with arrow dynamic styling -->
+  <path d="M 44 26 
+           C 40 21, 33 19, 26 21 
+           C 17 24, 11 33, 13 42 
+           C 15 51, 24 57, 33 56 
+           C 41 55, 47 49, 48 42
+           L 38.5 42
+           C 37.8 45.5, 34 48, 30 47.5
+           C 24.5 47, 21 42, 21.5 36.5
+           C 22 31, 26.5 27.5, 32 28
+           C 35 28.2, 38 29.8, 39.5 32
+           Z" 
+        fill="url(#fav-c-grad)" />
+  <!-- Inner Arrow Head / Flow Mark -->
+  <polygon points="46,23 37,28 44,34" fill="#2B3A8F" />
+</svg>
