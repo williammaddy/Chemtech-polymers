@@ -2,6 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { AnimatedCounter } from '../components/AnimatedCounter';
+import aboutImage1 from '../assets/About1.jpeg'
+import aboutImage2 from '../assets/About2.png'
 import {
   ShieldCheck,
   Award,
@@ -100,7 +102,7 @@ export const AboutPage: React.FC = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-md)' }}>
                 <img
-                  src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80"
+                  src={aboutImage1}
                   alt="Industrial textile screen printing manufacturing facility"
                   style={{ width: '100%', height: '240px', objectFit: 'cover', display: 'block' }}
                 />
@@ -116,7 +118,7 @@ export const AboutPage: React.FC = () => {
 
               <div className="card" style={{ padding: '0', overflow: 'hidden', border: '1px solid var(--border-subtle)', boxShadow: 'var(--shadow-md)' }}>
                 <img
-                  src="https://images.unsplash.com/photo-1579783902614-a3fb3927b675?auto=format&fit=crop&w=800&q=80"
+                  src={aboutImage2}
                   alt="Quality control laboratory testing textile printing inks"
                   style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
                 />

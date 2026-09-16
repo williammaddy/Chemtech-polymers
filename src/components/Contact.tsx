@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldCheck
 } from 'lucide-react';
+import { CONTACT_INFO } from '../config/contactInfo';
 
 interface ContactProps {
   selectedProduct?: string;
@@ -60,16 +61,7 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
      CONTACT DETAILS PLACEHOLDERS
      [EDIT HERE]: Update these values with the actual company information!
      ========================================================================== */
-  const contactInfo = {
-    // [PLACEHOLDER]: Replace with actual company phone number(s)
-    phone: '[+91 Phone Number]',
-    // [PLACEHOLDER]: Replace with actual primary sales/inquiry email
-    email: '[contact@chemtechindia.com / Email Address]',
-    // [PLACEHOLDER]: Replace with actual factory / office physical address
-    address: '[Factory / Office Address, Industrial Area, Gujarat / Maharashtra / India]',
-    // Operating hours
-    hours: 'Monday – Saturday: 9:00 AM – 6:30 PM IST',
-  };
+  const contactInfo = CONTACT_INFO;
 
   return (
     <section id="contact" className="section section-pastel" style={{ paddingTop: '80px', paddingBottom: '90px' }}>

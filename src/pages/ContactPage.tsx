@@ -16,6 +16,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { productsData } from '../data/productsData';
+import { CONTACT_INFO, sendWhatsAppNotification } from '../config/contactInfo';
 
 export const ContactPage: React.FC = () => {
   const location = useLocation();
@@ -124,7 +125,7 @@ export const ContactPage: React.FC = () => {
         data.append('request_type', type);
       });
 
-      const response = await fetch('https://formspree.io/f/mvkojeyd', {
+      const response = await fetch(CONTACT_INFO.formspreeEndpoint, {
         method: 'POST',
         body: data,
         headers: {
@@ -135,6 +136,17 @@ export const ContactPage: React.FC = () => {
       if (response.ok) {
         setIsSuccess(true);
         setErrorMessage(null);
+
+        // Background WhatsApp notification (fire and forget)
+        sendWhatsAppNotification({
+          name: formData.name.trim(),
+          company: formData.company.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          product_interest: formData.product_interest,
+          request_type: requestTypes.join(', '),
+          message: formData.message.trim(),
+        });
       } else {
         const result = await response.json().catch(() => null);
         if (result && result.errors && result.errors.length > 0) {
@@ -165,16 +177,7 @@ export const ContactPage: React.FC = () => {
     setErrorMessage(null);
   };
 
-  /* ==========================================================================
-     CONTACT DETAILS PLACEHOLDERS:
-     [EDIT HERE]: Update these values with the client's verified phone/email/address.
-     ========================================================================== */
-  const contactInfo = {
-    phone: '+91 63791 49283 / +91 98437 62668',
-    email: 'contact@chemtechindia.com / sales@chemtechindia.com',
-    address: '[Chemtech Polymers Manufacturing Plant & QC Labs, Industrial Area, India]',
-    hours: 'Monday – Saturday: 9:00 AM – 6:30 PM IST',
-  };
+  const contactInfo = CONTACT_INFO;
 
   return (
     <div className="contact-page" style={{ paddingTop: '100px' }}>
@@ -289,7 +292,7 @@ export const ContactPage: React.FC = () => {
               {!isSuccess && (
                 <form
                   id="sampleRequestForm"
-                  action="https://formspree.io/f/mvkojeyd"
+                  action={CONTACT_INFO.formspreeEndpoint}
                   method="POST"
                   onSubmit={handleSubmit}
                   noValidate

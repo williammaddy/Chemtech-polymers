@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { productCategories } from '../data/productsData';
 import { articlesData } from '../data/articlesData';
+import { CONTACT_INFO } from '../config/contactInfo';
 
 export const Footer: React.FC = () => {
   const scrollToTop = () => {
@@ -210,11 +211,11 @@ export const Footer: React.FC = () => {
               Technical trial formulations and bulk manufacturing supply:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)' }}>
-              <div><strong>Support:</strong> +91 63791 49283</div>
-              <div><strong>Sales:</strong> +91 98437 62668</div>
-              <div><strong>Email:</strong> [contact@chemtechindia.com]</div>
+              <div><strong>Support:</strong> {CONTACT_INFO.phoneSupport}</div>
+              <div><strong>Sales:</strong> {CONTACT_INFO.phoneSales}</div>
+              <div><strong>Email:</strong> {CONTACT_INFO.emailPrimary}</div>
               <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.78rem' }}>
-                Mon – Sat: 9:00 AM – 6:30 PM IST
+                {CONTACT_INFO.hours}
               </div>
             </div>
 

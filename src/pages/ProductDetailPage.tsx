@@ -16,8 +16,11 @@ import {
   ArrowRight,
   FileText,
   Sparkles,
-  Check
+  Check,
+  AlertCircle,
+  Loader2
 } from 'lucide-react';
+import { CONTACT_INFO, sendWhatsAppNotification } from '../config/contactInfo';
 
 export const ProductDetailPage: React.FC = () => {
   const { categorySlug, productSlug } = useParams<{ categorySlug: string; productSlug: string }>();
@@ -39,6 +42,8 @@ export const ProductDetailPage: React.FC = () => {
   const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [referenceId, setReferenceId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     company: '',
@@ -62,17 +67,66 @@ export const ProductDetailPage: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const randomRef = 'CT-SMPL-' + Math.floor(10000 + Math.random() * 90000);
-    setReferenceId(randomRef);
-    setIsSubmitted(true);
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    data.set('_subject', `New Chemtech Sample Batch Request - ${product.name} (${product.code})`);
+    data.set('product_requested', `${product.name} (${product.code})`);
+    data.set('product_interest', `${product.name} (${product.code})`);
+    data.set('request_type', 'Sample Batch');
+    if (formData.notes) {
+      data.set('message', formData.notes);
+    }
+
+    try {
+      const response = await fetch(CONTACT_INFO.formspreeEndpoint, {
+        method: 'POST',
+        body: data,
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const randomRef = 'CT-SMPL-' + Math.floor(10000 + Math.random() * 90000);
+        setReferenceId(randomRef);
+        setIsSubmitted(true);
+
+        // Fire WhatsApp notification (fire and forget)
+        sendWhatsAppNotification({
+          name: formData.name.trim(),
+          company: formData.company.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+          product_interest: `${product.name} (${product.code})`,
+          product_requested: `${product.name} (${product.code})`,
+          request_type: 'Sample Batch',
+          message: formData.notes.trim(),
+        });
+      } else {
+        const result = await response.json().catch(() => null);
+        if (result && result.errors && result.errors.length > 0) {
+          setErrorMessage(result.errors.map((err: { message: string }) => err.message).join(', '));
+        } else {
+          setErrorMessage('Something went wrong submitting your sample request. Please try again.');
+        }
+      }
+    } catch (err) {
+      setErrorMessage('Network error — please check your connection or email us directly.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCloseModal = () => {
     setIsSampleModalOpen(false);
     setTimeout(() => {
       setIsSubmitted(false);
+      setErrorMessage(null);
       setFormData({ name: '', company: '', email: '', phone: '', notes: '' });
     }, 300);
   };
@@ -316,7 +370,25 @@ export const ProductDetailPage: React.FC = () => {
             {/* Modal Body */}
             <div className="sample-modal-body">
               {!isSubmitted ? (
-                <form onSubmit={handleFormSubmit}>
+                <form
+                  id="sampleBatchRequestForm"
+                  action={CONTACT_INFO.formspreeEndpoint}
+                  method="POST"
+                  onSubmit={handleFormSubmit}
+                >
+                  <input type="hidden" name="_subject" value={`New Chemtech Sample Batch Request - ${product.name} (${product.code})`} />
+                  <input type="hidden" name="product_requested" value={`${product.name} (${product.code})`} />
+                  <input type="hidden" name="product_interest" value={`${product.name} (${product.code})`} />
+                  <input type="hidden" name="request_type" value="Sample Batch" />
+
+                  {/* Error Banner */}
+                  {errorMessage && (
+                    <div className="form-error-banner" style={{ marginBottom: '16px' }}>
+                      <AlertCircle size={16} />
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
                   {/* Selected Product Banner */}
                   <div
                     style={{
@@ -431,11 +503,21 @@ export const ProductDetailPage: React.FC = () => {
                     </button>
                     <button
                       type="submit"
+                      disabled={isSubmitting}
                       className="btn btn-secondary-green btn-md btn-shine"
-                      style={{ paddingLeft: '24px', paddingRight: '24px' }}
+                      style={{ paddingLeft: '24px', paddingRight: '24px', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
                     >
-                      <Send size={16} />
-                      <span>Submit Sample Requisition</span>
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="spinner-icon" size={16} />
+                          <span>Submitting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send size={16} />
+                          <span>Submit Sample Requisition</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </form>
