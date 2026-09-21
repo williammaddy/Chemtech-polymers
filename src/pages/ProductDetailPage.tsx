@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import {
-  getProductBySlug,
-  getCategoryBySlug,
+  getProductBySlug as getStaticProduct,
+  getCategoryBySlug as getStaticCategory,
   getRelatedProducts
 } from '../data/productsData';
+import {
+  getProductBySlug,
+  getCategoryBySlug,
+  getContactInfo
+} from '../lib/supabase';
 import {
   Download,
   Package,
@@ -29,14 +34,35 @@ export const ProductDetailPage: React.FC = () => {
     return <Navigate to="/products" replace />;
   }
 
-  const product = getProductBySlug(productSlug);
-  const category = getCategoryBySlug(categorySlug);
+  const [product, setProduct] = useState<any>(() => getStaticProduct(productSlug));
+  const [category, setCategory] = useState<any>(() => getStaticCategory(categorySlug));
+  const [loading, setLoading] = useState<boolean>(!product || !category);
+  const [contactEndpoint, setContactEndpoint] = useState<string>(CONTACT_INFO.formspreeEndpoint);
 
-  if (!product || !category) {
-    return <Navigate to="/products" replace />;
-  }
-
-  const relatedProducts = getRelatedProducts(product.slug, 3);
+  useEffect(() => {
+    let mounted = true;
+    if (productSlug && categorySlug) {
+      Promise.all([
+        getProductBySlug(productSlug),
+        getCategoryBySlug(categorySlug),
+        getContactInfo(),
+      ]).then(([p, c, ci]) => {
+        if (!mounted) return;
+        if (p) setProduct(p);
+        if (c) setCategory(c);
+        if (ci && ci.formspree_endpoint) {
+          setContactEndpoint(ci.formspree_endpoint);
+        }
+        setLoading(false);
+      }).catch((err) => {
+        console.error('Error loading product details:', err);
+        if (mounted) setLoading(false);
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [productSlug, categorySlug]);
 
   // Sample Batch Request Modal State
   const [isSampleModalOpen, setIsSampleModalOpen] = useState(false);
@@ -67,6 +93,43 @@ export const ProductDetailPage: React.FC = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleCloseModal = () => {
+    setIsSampleModalOpen(false);
+    setTimeout(() => {
+      setIsSubmitted(false);
+      setErrorMessage(null);
+      setFormData({ name: '', company: '', email: '', phone: '', notes: '' });
+    }, 300);
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '100px' }}>
+        <Loader2 className="spinner-icon" size={36} color="var(--color-primary)" />
+      </div>
+    );
+  }
+
+  if (!product || !category) {
+    return <Navigate to="/products" replace />;
+  }
+
+  const productName = product.name;
+  const productCode = product.code || (product.slug ? product.slug.toUpperCase() : '');
+  const productImage = product.image || product.image_url || '';
+  const productPdf = product.pdfUrl || product.pdf_url || `/assets/pdfs/${product.slug}.pdf`;
+  const productTagline = product.tagline || '';
+  const productDesc = product.longDesc || product.description || product.shortDesc || '';
+  const productFeatures: string[] = Array.isArray(product.features)
+    ? product.features
+    : (product.specs?.features || []);
+  const productApplications: string[] = Array.isArray(product.applications)
+    ? product.applications
+    : (product.specs?.applications || []);
+  const categoryName = category.name;
+  const categorySlugVal = category.slug;
+  const categoryShortName = category.shortName || category.short_name || category.name;
+
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -74,16 +137,16 @@ export const ProductDetailPage: React.FC = () => {
 
     const form = e.currentTarget;
     const data = new FormData(form);
-    data.set('_subject', `New Chemtech Sample Batch Request - ${product.name} (${product.code})`);
-    data.set('product_requested', `${product.name} (${product.code})`);
-    data.set('product_interest', `${product.name} (${product.code})`);
+    data.set('_subject', `New Chemtech Sample Batch Request - ${productName} (${productCode})`);
+    data.set('product_requested', `${productName} (${productCode})`);
+    data.set('product_interest', `${productName} (${productCode})`);
     data.set('request_type', 'Sample Batch');
     if (formData.notes) {
       data.set('message', formData.notes);
     }
 
     try {
-      const response = await fetch(CONTACT_INFO.formspreeEndpoint, {
+      const response = await fetch(contactEndpoint || CONTACT_INFO.formspreeEndpoint, {
         method: 'POST',
         body: data,
         headers: {
@@ -102,8 +165,8 @@ export const ProductDetailPage: React.FC = () => {
           company: formData.company.trim(),
           phone: formData.phone.trim(),
           email: formData.email.trim(),
-          product_interest: `${product.name} (${product.code})`,
-          product_requested: `${product.name} (${product.code})`,
+          product_interest: `${productName} (${productCode})`,
+          product_requested: `${productName} (${productCode})`,
           request_type: 'Sample Batch',
           message: formData.notes.trim(),
         });
@@ -122,28 +185,19 @@ export const ProductDetailPage: React.FC = () => {
     }
   };
 
-  const handleCloseModal = () => {
-    setIsSampleModalOpen(false);
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setErrorMessage(null);
-      setFormData({ name: '', company: '', email: '', phone: '', notes: '' });
-    }, 300);
-  };
-
   /* ==========================================================================
      PDF SPEC SHEET PATH:
      Opens/downloads the actual technical data sheet PDF directly.
      ========================================================================== */
-  const pdfFilePath = product.pdfUrl || `/assets/pdfs/${product.slug}.pdf`;
+  const pdfFilePath = productPdf;
 
   return (
     <div className="product-detail-page" style={{ paddingTop: '100px', backgroundColor: '#FAFAFA' }}>
       <Breadcrumbs
         items={[
           { label: 'Products', to: '/products' },
-          { label: category.name, to: `/products/${category.slug}` },
-          { label: product.name },
+          { label: categoryName, to: `/products/${categorySlugVal}` },
+          { label: productName },
         ]}
       />
 
@@ -167,8 +221,8 @@ export const ProductDetailPage: React.FC = () => {
                 }}
               >
                 <img
-                  src={product.image}
-                  alt={`${product.name} industrial print detail`}
+                  src={productImage}
+                  alt={`${productName} industrial print detail`}
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
 
@@ -200,7 +254,7 @@ export const ProductDetailPage: React.FC = () => {
                   Recommended Substrates & Machinery:
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {product.applications.map((app, idx) => (
+                  {productApplications.map((app, idx) => (
                     <span
                       key={idx}
                       style={{
@@ -233,10 +287,10 @@ export const ProductDetailPage: React.FC = () => {
                     borderRadius: 'var(--radius-sm)',
                   }}
                 >
-                  {product.code}
+                  {productCode}
                 </span>
                 <Link
-                  to={`/products/${category.slug}`}
+                  to={`/products/${categorySlugVal}`}
                   style={{
                     fontSize: '0.85rem',
                     fontWeight: 600,
@@ -244,36 +298,40 @@ export const ProductDetailPage: React.FC = () => {
                     textDecoration: 'none',
                   }}
                 >
-                  {category.name}
+                  {categoryName}
                 </Link>
               </div>
 
               <h1 style={{ fontSize: 'clamp(1.9rem, 5vw, 2.5rem)', color: 'var(--text-main)', marginBottom: '8px', fontFamily: 'var(--font-heading)' }}>
-                {product.name}
+                {productName}
               </h1>
 
-              <div style={{ fontSize: '1.05rem', color: 'var(--color-primary)', fontWeight: 600, marginBottom: '20px' }}>
-                {product.tagline}
-              </div>
+              {productTagline && (
+                <div style={{ fontSize: '1.05rem', color: 'var(--color-primary)', fontWeight: 600, marginBottom: '20px' }}>
+                  {productTagline}
+                </div>
+              )}
 
               <p style={{ fontSize: '1.02rem', color: 'var(--text-body)', lineHeight: 1.75, marginBottom: '24px' }}>
-                {product.longDesc}
+                {productDesc}
               </p>
 
               {/* Key Features Bullet List with Emerald Green Checkmarks */}
-              <div style={{ marginBottom: '36px' }}>
-                <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                  Formulation Highlights:
+              {productFeatures.length > 0 && (
+                <div style={{ marginBottom: '36px' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                    Formulation Highlights:
+                  </div>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {productFeatures.map((feat, idx) => (
+                      <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.925rem', color: 'var(--text-body)' }}>
+                        <CheckCircle2 size={17} color="var(--color-secondary-green)" style={{ flexShrink: 0 }} />
+                        <span>{feat}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {product.features.map((feat, idx) => (
-                    <li key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.925rem', color: 'var(--text-body)' }}>
-                      <CheckCircle2 size={17} color="var(--color-secondary-green)" style={{ flexShrink: 0 }} />
-                      <span>{feat}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              )}
 
               {/* THE TWO CLEAR ACTION BUTTONS (NO TABLES, NO PRICING) */}
               <div
@@ -289,7 +347,7 @@ export const ProductDetailPage: React.FC = () => {
                   {/* Button 1: Download PDF */}
                   <a
                     href={pdfFilePath}
-                    download={`${product.code}-TDS.pdf`}
+                    download={`${productCode}-TDS.pdf`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-primary btn-lg btn-shine"
@@ -353,7 +411,7 @@ export const ProductDetailPage: React.FC = () => {
                   Request Sample Batch
                 </h3>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', margin: 0 }}>
-                  For industrial print trials: <strong>{product.name}</strong> ({product.code})
+                  For industrial print trials: <strong>{productName}</strong> ({productCode})
                 </p>
               </div>
 
@@ -372,13 +430,13 @@ export const ProductDetailPage: React.FC = () => {
               {!isSubmitted ? (
                 <form
                   id="sampleBatchRequestForm"
-                  action={CONTACT_INFO.formspreeEndpoint}
+                  action={contactEndpoint || CONTACT_INFO.formspreeEndpoint}
                   method="POST"
                   onSubmit={handleFormSubmit}
                 >
-                  <input type="hidden" name="_subject" value={`New Chemtech Sample Batch Request - ${product.name} (${product.code})`} />
-                  <input type="hidden" name="product_requested" value={`${product.name} (${product.code})`} />
-                  <input type="hidden" name="product_interest" value={`${product.name} (${product.code})`} />
+                  <input type="hidden" name="_subject" value={`New Chemtech Sample Batch Request - ${productName} (${productCode})`} />
+                  <input type="hidden" name="product_requested" value={`${productName} (${productCode})`} />
+                  <input type="hidden" name="product_interest" value={`${productName} (${productCode})`} />
                   <input type="hidden" name="request_type" value="Sample Batch" />
 
                   {/* Error Banner */}
@@ -407,11 +465,11 @@ export const ProductDetailPage: React.FC = () => {
                         Selected Formulation
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--color-primary)' }}>
-                        {product.name} ({product.code})
+                        {productName} ({productCode})
                       </div>
                     </div>
                     <span style={{ fontSize: '0.78rem', color: 'var(--color-secondary-green)', fontWeight: 700 }}>
-                      ✓ {category.shortName}
+                      ✓ {categoryShortName}
                     </span>
                   </div>
 
@@ -560,7 +618,7 @@ export const ProductDetailPage: React.FC = () => {
                   </div>
 
                   <p style={{ color: 'var(--text-body)', fontSize: '0.95rem', lineHeight: 1.65, maxWidth: '440px', margin: '0 auto 24px' }}>
-                    Thank you, <strong>{formData.name}</strong>. Our technical dispatch chemist for <strong>{product.name}</strong> will review your trial specifications and contact you at <strong>{formData.email}</strong> within 24 hours with courier tracking details.
+                    Thank you, <strong>{formData.name}</strong>. Our technical dispatch chemist for <strong>{productName}</strong> will review your trial specifications and contact you at <strong>{formData.email}</strong> within 24 hours with courier tracking details.
                   </p>
 
                   <button

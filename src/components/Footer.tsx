@@ -13,8 +13,26 @@ import {
 import { productCategories } from '../data/productsData';
 import { articlesData } from '../data/articlesData';
 import { CONTACT_INFO } from '../config/contactInfo';
+import { getCategories, getResources, getContactInfo } from '../lib/supabase';
+import type { CategoryRow, ResourceRow, ContactInfoRow } from '../types/database';
 
 export const Footer: React.FC = () => {
+  const [categories, setCategories] = React.useState<any[]>(productCategories);
+  const [articles, setArticles] = React.useState<any[]>(articlesData);
+  const [contact, setContact] = React.useState<any>(CONTACT_INFO);
+
+  React.useEffect(() => {
+    getCategories().then((cats) => {
+      if (cats && cats.length > 0) setCategories(cats);
+    });
+    getResources().then((res) => {
+      if (res && res.length > 0) setArticles(res);
+    });
+    getContactInfo().then((c) => {
+      if (c) setContact(c);
+    });
+  }, []);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -101,6 +119,7 @@ export const Footer: React.FC = () => {
                 { label: 'About Chemtech', to: '/about' },
                 { label: 'Product Catalogue', to: '/products' },
                 { label: 'Technical Resources', to: '/resources' },
+                { label: 'Print Gallery', to: '/gallery' },
                 { label: 'Contact & Inquiries', to: '/contact' },
               ].map((item) => (
                 <li key={item.to}>
@@ -136,7 +155,7 @@ export const Footer: React.FC = () => {
               Product Categories
             </h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {productCategories.map((cat) => (
+              {categories.map((cat) => (
                 <li key={cat.slug}>
                   <Link
                     to={`/products/${cat.slug}`}
@@ -173,7 +192,7 @@ export const Footer: React.FC = () => {
               Application Guides
             </h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {articlesData.slice(0, 5).map((article) => (
+              {articles.slice(0, 5).map((article) => (
                 <li key={article.slug}>
                   <Link
                     to={`/resources/${article.slug}`}
@@ -211,11 +230,11 @@ export const Footer: React.FC = () => {
               Technical trial formulations and bulk manufacturing supply:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.85)' }}>
-              <div><strong>Support:</strong> {CONTACT_INFO.phoneSupport}</div>
-              <div><strong>Sales:</strong> {CONTACT_INFO.phoneSales}</div>
-              <div><strong>Email:</strong> {CONTACT_INFO.emailPrimary}</div>
+              <div><strong>Contact 1:</strong> {contact.phone_support || contact.phoneSupport || '+91 93635 19955'}</div>
+              <div><strong>Contact 2:</strong> {contact.phone_sales || contact.phoneSales || '+91 82208 04830'}</div>
+              <div><strong>Email:</strong> {contact.email || contact.emailPrimary || 'business.chemtech@gmail.com'}</div>
               <div style={{ color: 'rgba(255, 255, 255, 0.65)', fontSize: '0.78rem' }}>
-                {CONTACT_INFO.hours}
+                {contact.hours}
               </div>
             </div>
 

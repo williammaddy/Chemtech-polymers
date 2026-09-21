@@ -12,6 +12,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { CONTACT_INFO } from '../config/contactInfo';
+import { getContactInfo } from '../lib/supabase';
 
 interface ContactProps {
   selectedProduct?: string;
@@ -61,7 +62,13 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
      CONTACT DETAILS PLACEHOLDERS
      [EDIT HERE]: Update these values with the actual company information!
      ========================================================================== */
-  const contactInfo = CONTACT_INFO;
+  const [contactInfo, setContactInfo] = useState<any>(CONTACT_INFO);
+
+  React.useEffect(() => {
+    getContactInfo().then((info) => {
+      if (info) setContactInfo(info);
+    });
+  }, []);
 
   return (
     <section id="contact" className="section section-pastel" style={{ paddingTop: '80px', paddingBottom: '90px' }}>
@@ -333,11 +340,11 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
               }}
             >
               <h4 style={{ fontSize: '1.2rem', color: 'var(--primary-color)', marginBottom: '20px' }}>
-                Chemtech Polymers Headquarters
+                Technical & Direct Inquiries
               </h4>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-                {/* Phone */}
+                {/* Contact 1 */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
                   <div
                     style={{
@@ -356,11 +363,41 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
                   </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      Phone / WhatsApp
+                      Contact 1 (Phone / WhatsApp)
                     </div>
-                    {/* [PLACEHOLDER NOTE: Editable in contactInfo.phone] */}
                     <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      {contactInfo.phone}
+                      <a href="tel:+919363519955" style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {contactInfo.phone_support || contactInfo.phoneSupport || '+91 93635 19955'}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact 2 */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                  <div
+                    style={{
+                      width: '38px',
+                      height: '38px',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--accent-orange-soft)',
+                      color: 'var(--accent-orange)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Phone size={18} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      Contact 2 (Phone)
+                    </div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                      <a href="tel:+918220804830" style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {contactInfo.phone_sales || contactInfo.phoneSales || '+91 82208 04830'}
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -384,39 +421,12 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
                   </div>
                   <div>
                     <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      Technical & Sales Email
+                      Official Business Email
                     </div>
-                    {/* [PLACEHOLDER NOTE: Editable in contactInfo.email] */}
                     <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                      {contactInfo.email}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Address */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                  <div
-                    style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '8px',
-                      backgroundColor: 'var(--primary-light)',
-                      color: 'var(--primary-color)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <MapPin size={18} />
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                      Manufacturing Plant & Office
-                    </div>
-                    {/* [PLACEHOLDER NOTE: Editable in contactInfo.address] */}
-                    <div style={{ fontSize: '0.925rem', color: 'var(--text-body)', lineHeight: 1.5 }}>
-                      {contactInfo.address}
+                      <a href={`mailto:${contactInfo.email || contactInfo.emailPrimary || 'business.chemtech@gmail.com'}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {contactInfo.email || contactInfo.emailPrimary || 'business.chemtech@gmail.com'}
+                      </a>
                     </div>
                   </div>
                 </div>
@@ -445,92 +455,6 @@ export const Contact: React.FC<ContactProps> = ({ selectedProduct = '' }) => {
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-body)' }}>{contactInfo.hours}</div>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Embedded Map Card */}
-            <div
-              className="card"
-              style={{
-                padding: '0',
-                overflow: 'hidden',
-                backgroundColor: '#FFFFFF',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  height: '190px',
-                  background: 'linear-gradient(135deg, #E2E8F0 0%, #CBD5E1 100%)',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <svg
-                  width="100%"
-                  height="100%"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ position: 'absolute', top: 0, left: 0, opacity: 0.25 }}
-                >
-                  <defs>
-                    <pattern id="mapGrid2" width="30" height="30" patternUnits="userSpaceOnUse">
-                      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#2B3A8F" strokeWidth="1" />
-                    </pattern>
-                  </defs>
-                  <rect width="100%" height="100%" fill="url(#mapGrid2)" />
-                </svg>
-
-                {/* Pulsing Pin Marker */}
-                <div
-                  style={{
-                    position: 'relative',
-                    zIndex: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      backgroundColor: 'var(--primary-color)',
-                      color: '#FFFFFF',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      boxShadow: '0 4px 16px rgba(43, 58, 143, 0.45)',
-                    }}
-                  >
-                    <MapPin size={24} />
-                  </div>
-                  <div
-                    style={{
-                      backgroundColor: '#FFFFFF',
-                      color: 'var(--primary-color)',
-                      padding: '4px 12px',
-                      borderRadius: 'var(--radius-full)',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      marginTop: '6px',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                    }}
-                  >
-                    Chemtech Polymers Plant
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Interactive Google Map Embed Ready
-                </span>
-                <span style={{ fontSize: '0.8rem', color: 'var(--primary-color)', fontWeight: 600 }}>
-                  [Coordinates Configured]
-                </span>
               </div>
             </div>
           </div>

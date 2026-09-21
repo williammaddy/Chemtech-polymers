@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { getArticleBySlug, getRelatedArticles } from '../data/articlesData';
+import { getArticleBySlug as getStaticArticle, getRelatedArticles } from '../data/articlesData';
+import { getResourceBySlug } from '../lib/supabase';
 import {
   Clock,
   Printer,
@@ -11,7 +12,8 @@ import {
   ShieldCheck,
   FileCheck2,
   ArrowRight,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 
 export const ArticleDetailPage: React.FC = () => {
@@ -21,17 +23,58 @@ export const ArticleDetailPage: React.FC = () => {
     return <Navigate to="/resources" replace />;
   }
 
-  const article = getArticleBySlug(articleSlug);
+  const [article, setArticle] = useState<any>(() => articleSlug ? getStaticArticle(articleSlug) : null);
+  const [loading, setLoading] = useState<boolean>(!article);
+
+  useEffect(() => {
+    let mounted = true;
+    if (articleSlug) {
+      getResourceBySlug(articleSlug).then((data) => {
+        if (!mounted) return;
+        if (data) {
+          const mapped = {
+            ...data,
+            summary: data.teaser || (data as any).summary || '',
+            overview: data.body || (data as any).overview || '',
+            image: data.image_url || (data as any).image || '',
+            badgeColor: data.badge_color || (data as any).badgeColor || '#0284C7',
+            readTime: data.read_time || (data as any).readTime || '5 min read',
+            publishDate: data.publish_date || (data as any).publishDate || '',
+            takeaways: Array.isArray((data as any).takeaways) ? (data as any).takeaways : [],
+            sections: Array.isArray((data as any).sections) ? (data as any).sections : [],
+            author: data.author || 'Chemtech Application Lab',
+            standardRef: (data as any).standardRef || '',
+          };
+          setArticle(mapped);
+        }
+        setLoading(false);
+      }).catch((err) => {
+        console.error('Error loading article:', err);
+        if (mounted) setLoading(false);
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [articleSlug]);
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: '100px' }}>
+        <Loader2 className="spinner-icon" size={36} color="var(--color-primary)" />
+      </div>
+    );
+  }
 
   if (!article) {
     return <Navigate to="/resources" replace />;
   }
 
-  const relatedArticles = getRelatedArticles(article.slug, 3);
-
-  const handlePrint = () => {
-    window.print();
-  };
+  const relatedArticles = article.slug ? getRelatedArticles(article.slug, 3) : [];
 
   return (
     <div className="article-detail-page" style={{ paddingTop: '100px' }}>
@@ -86,7 +129,7 @@ export const ArticleDetailPage: React.FC = () => {
           </p>
 
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '32px', paddingBottom: '16px', borderBottom: '1px solid var(--border-subtle)' }}>
-            Technical Bulletin published by <strong>{article.author}</strong> | Reference Standard: <strong>{article.standardRef}</strong>
+            Technical Bulletin published by <strong>{article.author}</strong>{article.standardRef ? <> | Reference Standard: <strong>{article.standardRef}</strong></> : null}
           </div>
 
           {/* Featured Header Photo */}
@@ -126,141 +169,153 @@ export const ArticleDetailPage: React.FC = () => {
           </div>
 
           {/* Key Guidelines Checklist Box */}
-          <div
-            style={{
-              backgroundColor: '#F0FDF4',
-              border: '1px solid #BBF7D0',
-              borderRadius: 'var(--radius-md)',
-              padding: '24px 28px',
-              marginBottom: '40px',
-            }}
-          >
-            <h3 style={{ fontSize: '1.15rem', color: '#166534', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-heading)' }}>
-              <FileCheck2 size={20} color="var(--accent-teal)" />
-              <span>Key Processing Guidelines & Takeaways</span>
-            </h3>
-            <div className="article-checklist-grid">
-              {article.takeaways.map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#166534', lineHeight: 1.5 }}>
-                  <CheckCircle2 size={16} color="var(--accent-teal)" style={{ flexShrink: 0, marginTop: '3px' }} />
-                  <span>{item}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Full Sections */}
-          <div className="article-body-content" style={{ maxWidth: '75ch' }}>
-            {article.sections.map((section, sIdx) => (
-              <div key={sIdx} style={{ marginBottom: '40px' }}>
-                <h2 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '14px', fontFamily: 'var(--font-heading)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
-                  {section.heading}
-                </h2>
-
-                <p style={{ fontSize: '1.02rem', color: 'var(--text-body)', lineHeight: 1.8, marginBottom: '20px', whiteSpace: 'pre-line' }}>
-                  {section.content}
-                </p>
-
-                {/* Sub Checklist */}
-                {section.checklist && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0', paddingLeft: '8px' }}>
-                    {section.checklist.map((cItem, cIdx) => (
-                      <div key={cIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.95rem', color: 'var(--text-body)', lineHeight: 1.6 }}>
-                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary-color)', marginTop: '9px', flexShrink: 0 }} />
-                        <span>{cItem}</span>
-                      </div>
-                    ))}
+          {article.takeaways && article.takeaways.length > 0 && (
+            <div
+              style={{
+                backgroundColor: '#F0FDF4',
+                border: '1px solid #BBF7D0',
+                borderRadius: 'var(--radius-md)',
+                padding: '24px 28px',
+                marginBottom: '40px',
+              }}
+            >
+              <h3 style={{ fontSize: '1.15rem', color: '#166534', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: '8px', fontFamily: 'var(--font-heading)' }}>
+                <FileCheck2 size={20} color="var(--accent-teal)" />
+                <span>Key Processing Guidelines & Takeaways</span>
+              </h3>
+              <div className="article-checklist-grid">
+                {article.takeaways.map((item: string, idx: number) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '0.9rem', color: '#166534', lineHeight: 1.5 }}>
+                    <CheckCircle2 size={16} color="var(--accent-teal)" style={{ flexShrink: 0, marginTop: '3px' }} />
+                    <span>{item}</span>
                   </div>
-                )}
+                ))}
+              </div>
+            </div>
+          )}
 
-                {/* Technical Table */}
-                {section.table && (
-                  <div className="guide-table-wrapper" style={{ overflowX: 'auto', margin: '24px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
-                    <table className="guide-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
-                      <thead>
-                        <tr>
-                          {section.table.headers.map((h, hIdx) => (
-                            <th key={hIdx} style={{ background: '#F1F5F9', color: 'var(--text-main)', padding: '12px 16px', fontWeight: 700, borderBottom: '1px solid #CBD5E1', textAlign: 'left' }}>
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {section.table.rows.map((row, rIdx) => (
-                          <tr key={rIdx}>
-                            {row.map((cell, cIdx) => (
-                              <td key={cIdx} style={{ padding: '12px 16px', color: 'var(--text-body)', borderBottom: '1px solid #E2E8F0' }}>
-                                {cell}
-                              </td>
+          {/* Full Sections or Body Content */}
+          <div className="article-body-content" style={{ maxWidth: '75ch' }}>
+            {article.sections && article.sections.length > 0 ? (
+              article.sections.map((section: any, sIdx: number) => (
+                <div key={sIdx} style={{ marginBottom: '40px' }}>
+                  <h2 style={{ fontSize: '1.5rem', color: 'var(--text-main)', marginBottom: '14px', fontFamily: 'var(--font-heading)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px' }}>
+                    {section.heading}
+                  </h2>
+
+                  <p style={{ fontSize: '1.02rem', color: 'var(--text-body)', lineHeight: 1.8, marginBottom: '20px', whiteSpace: 'pre-line' }}>
+                    {section.content}
+                  </p>
+
+                  {/* Sub Checklist */}
+                  {section.checklist && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', margin: '20px 0', paddingLeft: '8px' }}>
+                      {section.checklist.map((cItem: string, cIdx: number) => (
+                        <div key={cIdx} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '0.95rem', color: 'var(--text-body)', lineHeight: 1.6 }}>
+                          <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--primary-color)', marginTop: '9px', flexShrink: 0 }} />
+                          <span>{cItem}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Technical Table */}
+                  {section.table && (
+                    <div className="guide-table-wrapper" style={{ overflowX: 'auto', margin: '24px 0', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
+                      <table className="guide-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                        <thead>
+                          <tr>
+                            {section.table.headers.map((h: string, hIdx: number) => (
+                              <th key={hIdx} style={{ background: '#F1F5F9', color: 'var(--text-main)', padding: '12px 16px', fontWeight: 700, borderBottom: '1px solid #CBD5E1', textAlign: 'left' }}>
+                                {h}
+                              </th>
                             ))}
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody>
+                          {section.table.rows.map((row: string[], rIdx: number) => (
+                            <tr key={rIdx}>
+                              {row.map((cell: string, cIdx: number) => (
+                                <td key={cIdx} style={{ padding: '12px 16px', color: 'var(--text-body)', borderBottom: '1px solid #E2E8F0' }}>
+                                  {cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
 
-                {/* Critical Advisory Box */}
-                {section.advisory && (
-                  <div
-                    style={{
-                      backgroundColor: '#FFFBEB',
-                      border: '1px solid #FDE68A',
-                      borderRadius: 'var(--radius-sm)',
-                      padding: '16px 20px',
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: '12px',
-                      fontSize: '0.925rem',
-                      color: '#92400E',
-                      marginTop: '20px',
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <AlertTriangle size={22} color="var(--accent-orange)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <div>{section.advisory}</div>
-                  </div>
-                )}
+                  {/* Critical Advisory Box */}
+                  {section.advisory && (
+                    <div
+                      style={{
+                        backgroundColor: '#FFFBEB',
+                        border: '1px solid #FDE68A',
+                        borderRadius: 'var(--radius-sm)',
+                        padding: '16px 20px',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '12px',
+                        fontSize: '0.925rem',
+                        color: '#92400E',
+                        marginTop: '20px',
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      <AlertTriangle size={22} color="var(--accent-orange)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div>{section.advisory}</div>
+                    </div>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: '1.05rem', color: 'var(--text-body)', lineHeight: 1.8, whiteSpace: 'pre-line', marginBottom: '40px' }}>
+                {article.body || article.overview}
               </div>
-            ))}
+            )}
 
             {/* Application Chemist Pro Tip */}
-            <div
-              style={{
-                backgroundColor: '#FAF5FF',
-                border: '1px solid #E9D5FF',
-                borderRadius: 'var(--radius-md)',
-                padding: '20px 24px',
-                margin: '36px 0',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                <Sparkles size={18} color="var(--accent-gold)" />
-                <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase' }}>
-                  Application Chemist Pro-Tip
-                </span>
+            {article.proTip && (
+              <div
+                style={{
+                  backgroundColor: '#FAF5FF',
+                  border: '1px solid #E9D5FF',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '20px 24px',
+                  margin: '36px 0',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <Sparkles size={18} color="var(--accent-gold)" />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', textTransform: 'uppercase' }}>
+                    Application Chemist Pro-Tip
+                  </span>
+                </div>
+                <p style={{ margin: 0, fontSize: '0.975rem', color: 'var(--text-body)', lineHeight: 1.7 }}>
+                  {article.proTip}
+                </p>
               </div>
-              <p style={{ margin: 0, fontSize: '0.975rem', color: 'var(--text-body)', lineHeight: 1.7 }}>
-                {article.proTip}
-              </p>
-            </div>
+            )}
 
             {/* Reference Standard Stamp */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                fontSize: '0.875rem',
-                color: 'var(--text-muted)',
-                paddingTop: '20px',
-                borderTop: '1px solid var(--border-subtle)',
-              }}
-            >
-              <ShieldCheck size={18} color="var(--primary-color)" />
-              <span>Grounded in International Industry Standard: <strong>{article.standardRef}</strong></span>
-            </div>
+            {article.standardRef && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontSize: '0.875rem',
+                  color: 'var(--text-muted)',
+                  paddingTop: '20px',
+                  borderTop: '1px solid var(--border-subtle)',
+                }}
+              >
+                <ShieldCheck size={18} color="var(--primary-color)" />
+                <span>Grounded in International Industry Standard: <strong>{article.standardRef}</strong></span>
+              </div>
+            )}
           </div>
         </div>
       </article>

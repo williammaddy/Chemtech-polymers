@@ -5,13 +5,13 @@ export const CONTACT_INFO = {
   formspreeEndpoint: "https://formspree.io/f/mvkojeyd",
   whatsappNumber: "918248212154",
   callMeBotApiKey: "YOUR_CALLMEBOT_API_KEY", // replace once obtained
-  phone: "+91 63791 49283 / +91 98437 62668",        // business phone numbers
-  phoneSupport: "+91 63791 49283",
-  phoneSales: "+91 98437 62668",
-  email: "contact@chemtechpolymers.com / sales@chemtechpolymers.com", // business email
-  emailPrimary: "contact@chemtechpolymers.com",
-  emailSales: "sales@chemtechpolymers.com",
-  address: "Chemtech Polymers Manufacturing Plant & QC Labs, Industrial Area, India", // business address
+  phone: "+91 93635 19955 / +91 82208 04830",        // business phone numbers
+  phoneSupport: "+91 93635 19955",
+  phoneSales: "+91 82208 04830",
+  email: "business.chemtech@gmail.com", // business email
+  emailPrimary: "business.chemtech@gmail.com",
+  emailSales: "business.chemtech@gmail.com",
+  address: "", // business address (removed per client request)
   mapEmbedUrl: "",  // add Google Maps embed URL if available
   hours: "Monday – Saturday: 9:00 AM – 6:30 PM IST",
 };

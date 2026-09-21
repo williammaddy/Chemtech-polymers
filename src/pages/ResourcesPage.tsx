@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { articlesData } from '../data/articlesData';
+import { articlesData as staticArticles } from '../data/articlesData';
+import { getResources } from '../lib/supabase';
 import {
   Clock,
   ArrowRight,
@@ -13,36 +14,56 @@ import {
 } from 'lucide-react';
 
 export const ResourcesPage: React.FC = () => {
+  const [articles, setArticles] = useState<any[]>(staticArticles);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const categories = [
-    { id: 'all', label: 'All Articles (7)' },
-    { id: 'Curing & Drying', label: 'Curing & Drying' },
-    { id: 'Troubleshooting', label: 'Troubleshooting' },
-    { id: 'Performance Fabrics', label: 'Performance Fabrics' },
-    { id: 'Specialty Effects', label: 'Specialty Effects' },
-    { id: 'Heat Transfer', label: 'Heat Transfer' },
-    { id: 'Compliance & Safety', label: 'Compliance & Safety' },
-    { id: 'Craft Ink', label: 'Craft Ink' },
-  ];
+  useEffect(() => {
+    let mounted = true;
+    getResources().then((data) => {
+      if (mounted && data && data.length > 0) {
+        const mapped = data.map((d: any) => ({
+          ...d,
+          summary: d.teaser || d.summary || '',
+          overview: d.body || d.overview || '',
+          image: d.image_url || d.image || '',
+          badgeColor: d.badge_color || d.badgeColor || '#0284C7',
+          readTime: d.read_time || d.readTime || '5 min read',
+          publishDate: d.publish_date || d.publishDate || '',
+          takeaways: Array.isArray(d.takeaways) ? d.takeaways : [],
+        }));
+        setArticles(mapped);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(articles.map((a) => a.category).filter(Boolean)));
+    return [
+      { id: 'all', label: `All Articles (${articles.length})` },
+      ...unique.map((cat) => ({ id: cat, label: cat })),
+    ];
+  }, [articles]);
 
   const filteredArticles = useMemo(() => {
-    return articlesData.filter((article) => {
+    return articles.filter((article) => {
       if (selectedCategory !== 'all' && article.category !== selectedCategory) {
         return false;
       }
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
-          article.title.toLowerCase().includes(q) ||
-          article.summary.toLowerCase().includes(q) ||
-          article.category.toLowerCase().includes(q)
+          (article.title && article.title.toLowerCase().includes(q)) ||
+          (article.summary && article.summary.toLowerCase().includes(q)) ||
+          (article.category && article.category.toLowerCase().includes(q))
         );
       }
       return true;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [articles, selectedCategory, searchQuery]);
 
   return (
     <div className="resources-page" style={{ paddingTop: '100px' }}>
@@ -223,19 +244,21 @@ export const ResourcesPage: React.FC = () => {
                     </p>
 
                     {/* Key Takeaways Preview */}
-                    <div style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '20px' }}>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary-color)', marginBottom: '6px' }}>
-                        Key Takeaways:
+                    {article.takeaways && article.takeaways.length > 0 && (
+                      <div style={{ backgroundColor: '#F8FAFC', padding: '12px', borderRadius: 'var(--radius-sm)', marginBottom: '20px' }}>
+                        <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary-color)', marginBottom: '6px' }}>
+                          Key Takeaways:
+                        </div>
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {article.takeaways.slice(0, 2).map((takeaway: string, idx: number) => (
+                            <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-body)' }}>
+                              <CheckCircle2 size={13} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                              <span>{takeaway}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        {article.takeaways.slice(0, 2).map((takeaway, idx) => (
-                          <li key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', fontSize: '0.78rem', color: 'var(--text-body)' }}>
-                            <CheckCircle2 size={13} color="var(--primary-color)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                            <span>{takeaway}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    )}
                   </div>
 
                   <div style={{ paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>

@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { productCategories, productsData } from '../data/productsData';
+import { getCategories, getProducts } from '../lib/supabase';
 import {
   ArrowRight,
   Filter,
@@ -15,11 +16,26 @@ import {
 } from 'lucide-react';
 
 export const ProductsPage: React.FC = () => {
+  const [categories, setCategories] = useState<any[]>(productCategories);
+  const [products, setProducts] = useState<any[]>(productsData);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'water' | 'oil' | 'specialty' | 'craft'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  useEffect(() => {
+    let mounted = true;
+    getCategories().then((cats) => {
+      if (mounted && cats && cats.length > 0) setCategories(cats);
+    });
+    getProducts().then((prods) => {
+      if (mounted && prods && prods.length > 0) setProducts(prods);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const filteredCategories = useMemo(() => {
-    return productCategories.filter((cat) => {
+    return categories.filter((cat) => {
       // Filter by type
       if (selectedFilter === 'water' && cat.slug !== 'water-base-inks') return false;
       if (selectedFilter === 'oil' && cat.slug !== 'non-pvc-acrysol' && cat.slug !== 'plastisol-inks') return false;
@@ -29,16 +45,18 @@ export const ProductsPage: React.FC = () => {
       // Filter by search query
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const matchCat = cat.name.toLowerCase().includes(query) || cat.description.toLowerCase().includes(query);
-        const matchProd = productsData.some(
-          (p) => p.categorySlug === cat.slug && (p.name.toLowerCase().includes(query) || p.code.toLowerCase().includes(query))
+        const matchCat = cat.name.toLowerCase().includes(query) || (cat.description && cat.description.toLowerCase().includes(query));
+        const matchProd = products.some(
+          (p) =>
+            (p.categorySlug === cat.slug || p.category_slug === cat.slug) &&
+            (p.name.toLowerCase().includes(query) || (p.code && p.code.toLowerCase().includes(query)))
         );
         return matchCat || matchProd;
       }
 
       return true;
     });
-  }, [selectedFilter, searchQuery]);
+  }, [categories, products, selectedFilter, searchQuery]);
 
   return (
     <div className="products-catalogue-page" style={{ paddingTop: '100px' }}>
@@ -162,7 +180,7 @@ export const ProductsPage: React.FC = () => {
                   style={{ position: 'relative', height: '280px', overflow: 'hidden', display: 'block' }}
                 >
                   <img
-                    src={cat.bannerImage}
+                    src={cat.bannerImage || cat.banner_image_url}
                     alt={cat.name}
                     style={{
                       width: '100%',
@@ -194,7 +212,7 @@ export const ProductsPage: React.FC = () => {
                         textTransform: 'uppercase',
                       }}
                     >
-                      {cat.categoryNumber}
+                      {cat.categoryNumber || cat.category_number}
                     </span>
                   </div>
                   <div style={{ position: 'absolute', bottom: '16px', left: '20px', right: '20px' }}>
@@ -217,11 +235,11 @@ export const ProductsPage: React.FC = () => {
                     {/* Products Preview Chips */}
                     <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                        Formulations in this series ({cat.productCount}):
+                        Formulations in this series ({products.filter((p) => (p.categorySlug === cat.slug || p.category_slug === cat.slug)).length}):
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {productsData
-                          .filter((p) => p.categorySlug === cat.slug)
+                        {products
+                          .filter((p) => p.categorySlug === cat.slug || p.category_slug === cat.slug)
                           .map((prod) => (
                             <Link
                               key={prod.slug}

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { productsData } from '../data/productsData';
 import { CONTACT_INFO, sendWhatsAppNotification } from '../config/contactInfo';
+import { getContactInfo, getProducts } from '../lib/supabase';
 
 export const ContactPage: React.FC = () => {
   const location = useLocation();
@@ -177,7 +178,17 @@ export const ContactPage: React.FC = () => {
     setErrorMessage(null);
   };
 
-  const contactInfo = CONTACT_INFO;
+  const [contactInfo, setContactInfo] = useState<any>(CONTACT_INFO);
+  const [productList, setProductList] = useState<any[]>(productsData);
+
+  useEffect(() => {
+    getContactInfo().then((info) => {
+      if (info) setContactInfo(info);
+    });
+    getProducts().then((prods) => {
+      if (prods && prods.length > 0) setProductList(prods);
+    });
+  }, []);
 
   return (
     <div className="contact-page" style={{ paddingTop: '100px' }}>
@@ -515,7 +526,7 @@ export const ContactPage: React.FC = () => {
                 }}
               >
                 <h4 style={{ fontSize: '1.15rem', color: 'var(--text-main)', marginBottom: '18px', fontFamily: 'var(--font-heading)' }}>
-                  Technical Support & Sales Office
+                  Direct Technical & Sales Support
                 </h4>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -523,10 +534,26 @@ export const ContactPage: React.FC = () => {
                     <Phone size={18} color="var(--primary-color)" style={{ marginTop: '3px', flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Telephone / WhatsApp:
+                        Contact 1 (Phone / WhatsApp):
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                        {contactInfo.phone}
+                        <a href="tel:+919363519955" style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {contactInfo.phone_support || contactInfo.phoneSupport || '+91 93635 19955'}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                    <Phone size={18} color="var(--primary-color)" style={{ marginTop: '3px', flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        Contact 2 (Phone):
+                      </div>
+                      <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                        <a href="tel:+918220804830" style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {contactInfo.phone_sales || contactInfo.phoneSales || '+91 82208 04830'}
+                        </a>
                       </div>
                     </div>
                   </div>
@@ -535,22 +562,12 @@ export const ContactPage: React.FC = () => {
                     <Mail size={18} color="var(--primary-color)" style={{ marginTop: '3px', flexShrink: 0 }} />
                     <div>
                       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Primary Email:
+                        Business Email:
                       </div>
                       <div style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                        {contactInfo.email}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                    <MapPin size={18} color="var(--primary-color)" style={{ marginTop: '3px', flexShrink: 0 }} />
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                        Manufacturing Plant & Lab:
-                      </div>
-                      <div style={{ fontSize: '0.925rem', color: 'var(--text-body)', lineHeight: 1.5 }}>
-                        {contactInfo.address}
+                        <a href={`mailto:${contactInfo.email || contactInfo.emailPrimary || 'business.chemtech@gmail.com'}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                          {contactInfo.email || contactInfo.emailPrimary || 'business.chemtech@gmail.com'}
+                        </a>
                       </div>
                     </div>
                   </div>
@@ -588,31 +605,6 @@ export const ContactPage: React.FC = () => {
                   All custom batches are accompanied by certificate of analysis (COA), safety data sheets (SDS),
                   and ZDHC MRSL Level 3 test verifications upon shipment.
                 </p>
-              </div>
-
-              {/* Card 3: Embedded Map Container Placeholder */}
-              <div
-                style={{
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden',
-                  border: '1px solid var(--border-subtle)',
-                  height: '200px',
-                  position: 'relative',
-                  backgroundColor: '#E2E8F0',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <MapPin size={28} color="var(--primary-color)" style={{ margin: '0 auto 8px', display: 'block' }} />
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    Industrial Facility Map Location
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    Factory visits by technical appointment only
-                  </div>
-                </div>
               </div>
             </div>
           </div>

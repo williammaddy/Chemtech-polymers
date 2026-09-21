@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
-import { getCategoryBySlug, getProductsByCategory, productCategories } from '../data/productsData';
+import { getCategoryBySlug as getStaticCategory, getProductsByCategory as getStaticProducts, productCategories } from '../data/productsData';
+import { getCategoryBySlug, getProducts } from '../lib/supabase';
 import {
   ArrowRight,
   FileText,
@@ -21,13 +22,30 @@ export const CategoryPage: React.FC = () => {
     return <Navigate to="/products" replace />;
   }
 
-  const category = getCategoryBySlug(categorySlug);
+  const [category, setCategory] = useState<any>(() => getStaticCategory(categorySlug));
+  const [products, setProducts] = useState<any[]>(() => getStaticProducts(categorySlug));
+
+  useEffect(() => {
+    let mounted = true;
+    if (categorySlug) {
+      getCategoryBySlug(categorySlug).then((cat) => {
+        if (mounted && cat) setCategory(cat);
+      });
+      getProducts().then((all) => {
+        if (mounted && all) {
+          const matching = all.filter((p: any) => p.category_slug === categorySlug || p.categorySlug === categorySlug);
+          if (matching.length > 0) setProducts(matching);
+        }
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [categorySlug]);
 
   if (!category) {
     return <Navigate to="/products" replace />;
   }
-
-  const products = getProductsByCategory(categorySlug);
 
   return (
     <div className="category-page" style={{ paddingTop: '100px' }}>
@@ -43,7 +61,7 @@ export const CategoryPage: React.FC = () => {
         <div
           className="category-mini-banner-bg"
           style={{
-            backgroundImage: `url("${category.bannerImage}")`,
+            backgroundImage: `url("${category.bannerImage || category.banner_image_url}")`,
             filter: 'brightness(0.55)',
           }}
         />
@@ -53,7 +71,7 @@ export const CategoryPage: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
             <span className="accent-dot orange" />
             <span style={{ fontSize: '0.85rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--accent-gold)' }}>
-              {category.categoryNumber}
+              {category.categoryNumber || category.category_number}
             </span>
           </div>
 
@@ -138,7 +156,7 @@ export const CategoryPage: React.FC = () => {
                   style={{ position: 'relative', height: '300px', overflow: 'hidden', display: 'block' }}
                 >
                   <img
-                    src={product.image}
+                    src={product.image || product.image_url}
                     alt={`${product.name} ink print sample`}
                     loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
@@ -147,23 +165,25 @@ export const CategoryPage: React.FC = () => {
                   <div className="card-wash-overlay" style={{ background: `linear-gradient(to top, rgba(15, 23, 42, 0.7) 0%, transparent 60%)` }} />
 
                   {/* Feature Badge */}
-                  <div
-                    className="product-img-badge"
-                    style={{
-                      position: 'absolute',
-                      bottom: '16px',
-                      left: '16px',
-                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                      backdropFilter: 'blur(6px)',
-                      color: '#FFFFFF',
-                      padding: '4px 10px',
-                      borderRadius: '4px',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    <span>{product.badge}</span>
-                  </div>
+                  {product.badge && (
+                    <div
+                      className="product-img-badge"
+                      style={{
+                        position: 'absolute',
+                        bottom: '16px',
+                        left: '16px',
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                        backdropFilter: 'blur(6px)',
+                        color: '#FFFFFF',
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span>{product.badge}</span>
+                    </div>
+                  )}
 
                   {/* "View Full Details (PDF)" Badge */}
                   <div className="product-pdf-badge">
@@ -180,7 +200,7 @@ export const CategoryPage: React.FC = () => {
                         style={{
                           fontSize: '0.75rem',
                           fontWeight: 700,
-                          color: product.accentColor,
+                          color: product.accentColor || product.accent_color || '#2B3A8F',
                           textTransform: 'uppercase',
                           letterSpacing: '0.04em',
                         }}
@@ -200,34 +220,36 @@ export const CategoryPage: React.FC = () => {
                     </h3>
 
                     <p style={{ color: 'var(--text-body)', fontSize: '0.925rem', lineHeight: 1.65, marginBottom: '20px' }}>
-                      {product.shortDesc}
+                      {product.shortDesc || product.short_desc || product.description}
                     </p>
 
                     {/* Key Attribute Pills */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '24px' }}>
-                      {product.features.slice(0, 3).map((feat, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: '0.75rem',
-                            background: '#F3F4F6',
-                            color: 'var(--text-body)',
-                            padding: '4px 10px',
-                            borderRadius: '4px',
-                            fontWeight: 600,
-                            border: '1px solid var(--border-subtle)',
-                          }}
-                        >
-                          {feat}
-                        </span>
-                      ))}
-                    </div>
+                    {product.features && product.features.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '24px' }}>
+                        {product.features.slice(0, 3).map((feat: string, idx: number) => (
+                          <span
+                            key={idx}
+                            style={{
+                              fontSize: '0.75rem',
+                              background: '#F3F4F6',
+                              color: 'var(--text-body)',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontWeight: 600,
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            {feat}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action Buttons: Download PDF and View Details */}
                   <div style={{ display: 'flex', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
                     <a
-                      href={product.pdfUrl || `/assets/pdfs/${product.slug}.pdf`}
+                      href={product.pdfUrl || product.pdf_url || `/assets/pdfs/${product.slug}.pdf`}
                       download={`${product.code}-TDS.pdf`}
                       className="btn btn-outline btn-sm"
                       style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}
