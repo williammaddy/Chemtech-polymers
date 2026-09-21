@@ -1,14 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import {
-  getProducts,
-  updateProduct,
-  uploadFile,
-  isSupabaseConfigured,
-} from '../../lib/supabase';
+import { getProducts, updateProduct, uploadFile, isSupabaseConfigured } from '../../lib/supabase';
 import type { ProductRow } from '../../types/database';
 import {
   FileText,
   Upload,
+  Link2,
   ExternalLink,
   Trash2,
   CheckCircle2,
@@ -19,23 +15,31 @@ import {
   FileX,
 } from 'lucide-react';
 
+const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+
+function isBlobUrl(url: string): boolean {
+  return url.startsWith('blob:');
+}
+
 export const ProductDocManagementPage: React.FC = () => {
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [pdfUrlDrafts, setPdfUrlDrafts] = useState<Record<string, string>>({});
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const loadProducts = async () => {
-    setLoading(true);
+  const loadProducts = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     try {
       const data = await getProducts();
       setProducts(data);
+      setPdfUrlDrafts(Object.fromEntries(data.map((p) => [p.id, p.pdf_url ?? ''])));
     } catch (err) {
       console.error('Error fetching products for doc management:', err);
       setStatusMessage({ type: 'error', text: 'Failed to load product documents.' });
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -43,47 +47,110 @@ export const ProductDocManagementPage: React.FC = () => {
     loadProducts();
   }, []);
 
+  const persistPdfUrl = async (product: ProductRow, pdfUrl: string) => {
+    if (isSupabaseConfigured && isBlobUrl(pdfUrl)) {
+      throw new Error('PDF upload did not return a public URL. Check that the product-pdfs storage bucket exists.');
+    }
+
+    await updateProduct(product.id, { pdf_url: pdfUrl });
+  };
+
   const handlePdfUpload = async (product: ProductRow, e: React.ChangeEvent<HTMLInputElement>) => {
     const inputElement = e.target;
-    if (!inputElement.files || !inputElement.files[0]) return;
+    const file = inputElement.files?.[0];
+    if (!file) return;
 
-    const file = inputElement.files[0];
     if (!file.name.toLowerCase().endsWith('.pdf') && file.type !== 'application/pdf') {
       setStatusMessage({ type: 'error', text: 'Only PDF files (.pdf) are permitted.' });
+      inputElement.value = '';
       return;
     }
 
-    setUploadingId(product.id);
+    if (file.size > MAX_PDF_SIZE_BYTES) {
+      setStatusMessage({ type: 'error', text: 'PDF must be 20MB or smaller.' });
+      inputElement.value = '';
+      return;
+    }
+
+    setSavingId(product.id);
     setStatusMessage(null);
 
     try {
-      const filePath = `${product.slug}-${Date.now()}.pdf`;
-      const pdfUrl = await uploadFile('product-pdfs', filePath, file);
+      const safeSlug = (product.slug || product.id).replace(/[^a-zA-Z0-9_-]/g, '-');
+      const filePath = `${safeSlug}-${Date.now()}.pdf`;
+      const pdfFile = file.type === 'application/pdf' ? file : new File([file], file.name, { type: 'application/pdf' });
+      const pdfUrl = await uploadFile('product-pdfs', filePath, pdfFile);
 
-      await updateProduct(product.id, { pdf_url: pdfUrl });
-      setStatusMessage({ type: 'success', text: `Technical Data Sheet for "${product.name}" uploaded successfully!` });
-      await loadProducts();
+      await persistPdfUrl(product, pdfUrl);
+      setPdfUrlDrafts((prev) => ({ ...prev, [product.id]: pdfUrl }));
+      setStatusMessage({
+        type: 'success',
+        text: `Technical Data Sheet for "${product.name}" uploaded successfully!`,
+      });
+      await loadProducts(false);
     } catch (err: any) {
       console.error('Error uploading PDF:', err);
-      setStatusMessage({ type: 'error', text: err.message || 'Failed to upload PDF.' });
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Failed to upload PDF. You can paste a PDF URL instead.',
+      });
     } finally {
-      setUploadingId(null);
-      if (inputElement) {
-        inputElement.value = '';
-      }
+      setSavingId(null);
+      inputElement.value = '';
+    }
+  };
+
+  const handleSavePdfUrl = async (product: ProductRow) => {
+    const rawUrl = (pdfUrlDrafts[product.id] ?? '').trim();
+    if (!rawUrl) {
+      setStatusMessage({ type: 'error', text: 'Enter a PDF URL before saving, or upload a PDF file.' });
+      return;
+    }
+
+    if (isBlobUrl(rawUrl)) {
+      setStatusMessage({ type: 'error', text: 'Temporary blob URLs cannot be saved. Upload the file again or paste a public PDF URL.' });
+      return;
+    }
+
+    const isAbsoluteUrl = /^https?:\/\//i.test(rawUrl);
+    const isSitePath = rawUrl.startsWith('/');
+    if (!isAbsoluteUrl && !isSitePath) {
+      setStatusMessage({ type: 'error', text: 'Enter a valid PDF URL (https://... or /path/to/file.pdf).' });
+      return;
+    }
+
+    setSavingId(product.id);
+    setStatusMessage(null);
+
+    try {
+      await persistPdfUrl(product, rawUrl);
+      setStatusMessage({
+        type: 'success',
+        text: `PDF link for "${product.name}" saved successfully!`,
+      });
+      await loadProducts(false);
+    } catch (err: any) {
+      console.error('Error saving PDF URL:', err);
+      setStatusMessage({ type: 'error', text: err.message || 'Failed to save PDF URL.' });
+    } finally {
+      setSavingId(null);
     }
   };
 
   const handleRemovePdf = async (product: ProductRow) => {
     if (!window.confirm(`Are you sure you want to detach the PDF for "${product.name}"?`)) return;
 
+    setSavingId(product.id);
     try {
       await updateProduct(product.id, { pdf_url: null });
+      setPdfUrlDrafts((prev) => ({ ...prev, [product.id]: '' }));
       setStatusMessage({ type: 'success', text: `PDF removed from "${product.name}".` });
-      await loadProducts();
+      await loadProducts(false);
     } catch (err: any) {
       console.error('Error removing PDF:', err);
       setStatusMessage({ type: 'error', text: err.message || 'Failed to remove PDF.' });
+    } finally {
+      setSavingId(null);
     }
   };
 
@@ -95,23 +162,21 @@ export const ProductDocManagementPage: React.FC = () => {
 
   const stats = {
     total: products.length,
-    withPdf: products.filter((p) => Boolean(p.pdf_url)).length,
-    missingPdf: products.filter((p) => !p.pdf_url).length,
+    withPdf: products.filter((p) => Boolean(p.pdf_url) && !isBlobUrl(p.pdf_url || '')).length,
+    missingPdf: products.filter((p) => !p.pdf_url || isBlobUrl(p.pdf_url)).length,
   };
 
   return (
     <div>
-      {/* Header */}
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '24px', fontWeight: 800, margin: '0 0 4px', color: '#0F172A', letterSpacing: '-0.4px' }}>
           Product Technical Document Management
         </h1>
         <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B' }}>
-          Upload and manage official Technical Data Sheets (TDS) and safety specification PDFs for each product.
+          Upload a TDS PDF or paste a public PDF URL for each product.
         </p>
       </div>
 
-      {/* Summary Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div style={{ backgroundColor: '#FFFFFF', padding: '18px 20px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '14px' }}>
           <div style={{ width: '44px', height: '44px', borderRadius: '10px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2B3A8F' }}>
@@ -144,7 +209,6 @@ export const ProductDocManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Status Feedback */}
       {statusMessage && (
         <div
           style={{
@@ -165,7 +229,6 @@ export const ProductDocManagementPage: React.FC = () => {
         </div>
       )}
 
-      {/* Search Bar */}
       <div style={{ marginBottom: '20px', position: 'relative', maxWidth: '360px' }}>
         <Search size={18} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
         <input
@@ -187,7 +250,6 @@ export const ProductDocManagementPage: React.FC = () => {
         />
       </div>
 
-      {/* Table */}
       <div
         style={{
           backgroundColor: '#FFFFFF',
@@ -211,13 +273,14 @@ export const ProductDocManagementPage: React.FC = () => {
                   <th style={{ padding: '14px 18px', fontWeight: 600 }}>Product Code</th>
                   <th style={{ padding: '14px 18px', fontWeight: 600 }}>Category</th>
                   <th style={{ padding: '14px 18px', fontWeight: 600 }}>TDS Status</th>
-                  <th style={{ padding: '14px 18px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '14px 18px', fontWeight: 600 }}>PDF file / URL</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((p) => {
-                  const hasPdf = Boolean(p.pdf_url);
-                  const isUploadingThis = uploadingId === p.id;
+                  const hasPdf = Boolean(p.pdf_url) && !isBlobUrl(p.pdf_url || '');
+                  const isSavingThis = savingId === p.id;
+                  const draftUrl = pdfUrlDrafts[p.id] ?? '';
 
                   return (
                     <tr key={p.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
@@ -267,10 +330,40 @@ export const ProductDocManagementPage: React.FC = () => {
                           </span>
                         )}
                       </td>
-                      <td style={{ padding: '14px 18px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                          {/* Upload/Replace Button */}
-                          <label
+                      <td style={{ padding: '14px 18px', minWidth: '420px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <input
+                            type="url"
+                            placeholder="https://example.com/tds.pdf"
+                            value={draftUrl}
+                            disabled={isSavingThis}
+                            onChange={(e) =>
+                              setPdfUrlDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleSavePdfUrl(p);
+                              }
+                            }}
+                            style={{
+                              flex: '1 1 220px',
+                              height: '36px',
+                              padding: '0 10px',
+                              borderRadius: '6px',
+                              border: '1px solid #CBD5E1',
+                              fontSize: '13px',
+                              outline: 'none',
+                              backgroundColor: '#FFFFFF',
+                              boxSizing: 'border-box',
+                              color: '#0F172A',
+                            }}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={() => handleSavePdfUrl(p)}
+                            disabled={isSavingThis}
                             style={{
                               display: 'inline-flex',
                               alignItems: 'center',
@@ -281,12 +374,35 @@ export const ProductDocManagementPage: React.FC = () => {
                               color: '#1E293B',
                               fontSize: '13px',
                               fontWeight: 600,
-                              cursor: isUploadingThis ? 'not-allowed' : 'pointer',
+                              cursor: isSavingThis ? 'not-allowed' : 'pointer',
                               border: '1px solid #CBD5E1',
                             }}
                           >
-                            {isUploadingThis ? (
-                              <Loader2 size={14} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
+                            {isSavingThis ? (
+                              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                            ) : (
+                              <Link2 size={14} />
+                            )}
+                            <span>Save URL</span>
+                          </button>
+
+                          <label
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              backgroundColor: '#EFF6FF',
+                              color: '#1E3A8A',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: isSavingThis ? 'not-allowed' : 'pointer',
+                              border: '1px solid #BFDBFE',
+                            }}
+                          >
+                            {isSavingThis ? (
+                              <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
                             ) : (
                               <Upload size={14} />
                             )}
@@ -294,13 +410,12 @@ export const ProductDocManagementPage: React.FC = () => {
                             <input
                               type="file"
                               accept=".pdf,application/pdf"
-                              disabled={isUploadingThis}
+                              disabled={isSavingThis}
                               onChange={(e) => handlePdfUpload(p, e)}
                               style={{ display: 'none' }}
                             />
                           </label>
 
-                          {/* Preview Link */}
                           {hasPdf && (
                             <a
                               href={p.pdf_url!}
@@ -313,8 +428,8 @@ export const ProductDocManagementPage: React.FC = () => {
                                 gap: '4px',
                                 padding: '6px 10px',
                                 borderRadius: '6px',
-                                backgroundColor: '#EFF6FF',
-                                color: '#2B3A8F',
+                                backgroundColor: '#ECFDF5',
+                                color: '#047857',
                                 fontSize: '13px',
                                 fontWeight: 600,
                                 textDecoration: 'none',
@@ -325,9 +440,9 @@ export const ProductDocManagementPage: React.FC = () => {
                             </a>
                           )}
 
-                          {/* Detach PDF */}
                           {hasPdf && (
                             <button
+                              type="button"
                               onClick={() => handleRemovePdf(p)}
                               title="Remove PDF"
                               style={{

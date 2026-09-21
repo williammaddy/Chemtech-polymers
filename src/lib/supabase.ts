@@ -268,26 +268,12 @@ export async function updateProduct(id: string, updates: Partial<ProductRow>): P
       return dataBySlug as ProductRow;
     }
 
-    // Local cache update if table empty or not found in Supabase
-    const prods = getLocalProducts();
-    const index = prods.findIndex((p) => p.id === id || p.slug === id);
-    if (index !== -1) {
-      prods[index] = { ...prods[index], ...updates };
-      saveLocalProducts(prods);
-      return prods[index];
-    }
-
-    return { id, ...updates } as ProductRow;
+    throw new Error(
+      error?.message || slugError?.message || 'Failed to update product in the database.'
+    );
   } catch (err) {
-    console.warn('Supabase updateProduct exception, updating local cache:', err);
-    const prods = getLocalProducts();
-    const index = prods.findIndex((p) => p.id === id || p.slug === id);
-    if (index !== -1) {
-      prods[index] = { ...prods[index], ...updates };
-      saveLocalProducts(prods);
-      return prods[index];
-    }
-    return { id, ...updates } as ProductRow;
+    const message = err instanceof Error ? err.message : 'Failed to update product in the database.';
+    throw new Error(message);
   }
 }
 
@@ -672,33 +658,37 @@ export async function updateContactInfo(updates: Partial<ContactInfoRow>): Promi
 // STORAGE HELPERS (with Blob URL Fallback)
 // ============================================================
 
+function sanitizeStoragePath(filePath: string): string {
+  return filePath.replace(/[^a-zA-Z0-9._/-]/g, '-');
+}
+
 export async function uploadFile(
   bucket: 'product-images' | 'product-pdfs' | 'gallery-images' | 'category-banners' | 'resource-images',
   filePath: string,
   file: File
 ): Promise<string> {
+  const safePath = sanitizeStoragePath(filePath);
+
   if (!isSupabaseConfigured) {
     return URL.createObjectURL(file);
   }
 
-  try {
-    const { error: uploadError } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, file, {
-        upsert: true,
-      });
+  const { error: uploadError } = await supabase.storage.from(bucket).upload(safePath, file, {
+    upsert: true,
+    cacheControl: '3600',
+    contentType: file.type || undefined,
+  });
 
-    if (uploadError) {
-      console.warn(`Supabase storage upload error in ${bucket}, falling back to object URL:`, uploadError);
-      return URL.createObjectURL(file);
-    }
-
-    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-    return data.publicUrl;
-  } catch (err) {
-    console.warn(`Supabase storage failed, falling back to object URL:`, err);
-    return URL.createObjectURL(file);
+  if (uploadError) {
+    throw new Error(uploadError.message || `Failed to upload file to ${bucket}.`);
   }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(safePath);
+  if (!data?.publicUrl) {
+    throw new Error('Upload succeeded but no public URL was returned.');
+  }
+
+  return data.publicUrl;
 }
 
 export async function deleteStorageFile(bucket: string, filePath: string): Promise<void> {
