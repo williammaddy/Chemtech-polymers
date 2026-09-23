@@ -157,7 +157,7 @@ export const AdminLoginPage: React.FC = () => {
                 disabled={isLockedOut || isSubmitting}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@chemtechpolymers.com"
+                placeholder="Enter the admin emails"
                 style={{
                   width: '100%',
                   height: '46px',

@@ -587,25 +587,7 @@ export const ContactPage: React.FC = () => {
               </div>
 
               {/* Card 2: Regulatory Assurance */}
-              <div
-                className="contact-info-card"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(0, 168, 150, 0.08) 0%, rgba(43, 58, 143, 0.06) 100%)',
-                  borderRadius: 'var(--radius-lg)',
-                  border: '1px solid rgba(0, 168, 150, 0.25)',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                  <ShieldCheck size={22} color="var(--accent-teal)" />
-                  <span style={{ fontSize: '0.925rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                    Export Compliance Assurance
-                  </span>
-                </div>
-                <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-body)', lineHeight: 1.6 }}>
-                  All custom batches are accompanied by certificate of analysis (COA), safety data sheets (SDS),
-                  and ZDHC MRSL Level 3 test verifications upon shipment.
-                </p>
-              </div>
+              
             </div>
           </div>
         </div>
