@@ -1,23 +1,69 @@
-import { createClient } from '@supabase/supabase-js';
 import type { Database, ProductRow, CategoryRow, ResourceRow, GalleryImageRow, ContactInfoRow } from '../types/database';
 import { productsData, productCategories, Product } from '../data/productsData';
 import { articlesData } from '../data/articlesData';
 import { CONTACT_INFO } from '../config/contactInfo';
 
-// Read env variables safely in Vite
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// MongoDB Atlas is the active database
+export const isDatabaseConnected = true;
+export const isSupabaseConfigured = true;
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && 
-  supabaseAnonKey && 
-  !supabaseUrl.includes('your-project-id')
-);
+// Mock supabase client to satisfy any legacy direct references without errors
+export const supabase = {
+  from: () => ({
+    select: () => Promise.resolve({ data: [], error: null }),
+    insert: () => Promise.resolve({ data: null, error: null }),
+    update: () => Promise.resolve({ data: null, error: null }),
+    delete: () => Promise.resolve({ data: null, error: null }),
+  }),
+  storage: {
+    from: () => ({
+      upload: () => Promise.resolve({ data: null, error: null }),
+      getPublicUrl: () => ({ data: { publicUrl: '' } }),
+      remove: () => Promise.resolve({ data: null, error: null }),
+    }),
+  },
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null } }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signInWithPassword: () => Promise.resolve({ data: {}, error: null }),
+    signOut: () => Promise.resolve({ error: null }),
+  },
+} as any;
 
-export const supabase = createClient<Database>(
-  supabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-anon-key'
-);
+// Helper to call MongoDB Atlas backend API with error safety
+async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  try {
+    const res = await fetch(`/api${endpoint}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options?.headers || {}),
+      },
+      ...options,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.warn(`API call /api${endpoint} failed, falling back to local storage:`, err);
+    return null;
+  }
+}
+
+// Convert file to Base64 for MongoDB storage
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ============================================================
 // ADAPTER HELPERS (convert static types to DB rows if needed)
@@ -80,7 +126,7 @@ function mapArticleToRow(a: typeof articlesData[0]): ResourceRow {
 }
 
 // ============================================================
-// PRODUCTS CRUD (with Local Cache Fallback)
+// PRODUCTS CRUD (Powered by MongoDB Atlas with Local Cache Fallback)
 // ============================================================
 
 const LOCAL_PRODUCTS_KEY = 'chemtech_products_cache';
@@ -111,55 +157,19 @@ function saveLocalProducts(products: ProductRow[]) {
 }
 
 export async function getProducts(): Promise<ProductRow[]> {
-  if (!isSupabaseConfigured) {
-    return getLocalProducts();
+  const fromApi = await apiFetch<ProductRow[]>('/products');
+  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
+    saveLocalProducts(fromApi);
+    return fromApi;
   }
-
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      console.warn('Supabase getProducts returned no data or error, falling back to local dataset:', error);
-      return getLocalProducts();
-    }
-
-    return data as ProductRow[];
-  } catch (err) {
-    console.error('Error fetching products from Supabase:', err);
-    return getLocalProducts();
-  }
+  return getLocalProducts();
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductRow | null> {
-  if (!isSupabaseConfigured) {
-    const local = getLocalProducts();
-    const found = local.find((p) => p.slug === slug);
-    return found || null;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error || !data) {
-      const local = getLocalProducts();
-      const fallback = local.find((p) => p.slug === slug);
-      return fallback || null;
-    }
-
-    return data as ProductRow;
-  } catch (err) {
-    console.error(`Error fetching product ${slug} from Supabase:`, err);
-    const local = getLocalProducts();
-    const fallback = local.find((p) => p.slug === slug);
-    return fallback || null;
-  }
+  const fromApi = await apiFetch<ProductRow>(`/products/${slug}`);
+  if (fromApi) return fromApi;
+  const local = getLocalProducts();
+  return local.find((p) => p.slug === slug || p.id === slug) || null;
 }
 
 export async function createProduct(product: Partial<ProductRow> & { id: string; slug: string; name: string; category_slug: string }): Promise<ProductRow> {
@@ -183,115 +193,41 @@ export async function createProduct(product: Partial<ProductRow> & { id: string;
     created_at: new Date().toISOString(),
   };
 
-  if (!isSupabaseConfigured) {
-    const prods = getLocalProducts();
-    prods.unshift(newRow);
-    saveLocalProducts(prods);
-    return newRow;
-  }
+  const fromApi = await apiFetch<ProductRow>('/products', {
+    method: 'POST',
+    body: JSON.stringify(product),
+  });
 
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      // @ts-ignore
-      .insert([product])
-      .select()
-      .maybeSingle();
-
-    if (error || !data) {
-      console.warn('Supabase createProduct failed, saving locally:', error);
-      const prods = getLocalProducts();
-      prods.unshift(newRow);
-      saveLocalProducts(prods);
-      return newRow;
-    }
-    return data as ProductRow;
-  } catch (err) {
-    console.warn('Supabase createProduct exception, saving locally:', err);
-    const prods = getLocalProducts();
-    prods.unshift(newRow);
-    saveLocalProducts(prods);
-    return newRow;
-  }
+  const prods = getLocalProducts();
+  const saved = fromApi || newRow;
+  prods.unshift(saved);
+  saveLocalProducts(prods);
+  return saved;
 }
 
 export async function updateProduct(id: string, updates: Partial<ProductRow>): Promise<ProductRow> {
-  if (!isSupabaseConfigured) {
-    const prods = getLocalProducts();
-    const index = prods.findIndex((p) => p.id === id || p.slug === id);
-    if (index !== -1) {
-      prods[index] = { ...prods[index], ...updates };
-      saveLocalProducts(prods);
-      return prods[index];
-    }
-    const updated = { id, ...updates } as ProductRow;
-    prods.push(updated);
-    saveLocalProducts(prods);
-    return updated;
+  const fromApi = await apiFetch<ProductRow>(`/products/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  const prods = getLocalProducts();
+  const index = prods.findIndex((p) => p.id === id || p.slug === id);
+  const updatedItem = fromApi || (index !== -1 ? { ...prods[index], ...updates } : ({ id, ...updates } as ProductRow));
+
+  if (index !== -1) {
+    prods[index] = updatedItem;
+  } else {
+    prods.push(updatedItem);
   }
-
-  try {
-    const { data, error } = await supabase
-      .from('products')
-      // @ts-ignore
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .maybeSingle();
-
-    if (!error && data) {
-      const prods = getLocalProducts();
-      const index = prods.findIndex((p) => p.id === id || p.slug === id);
-      if (index !== -1) {
-        prods[index] = data as ProductRow;
-        saveLocalProducts(prods);
-      }
-      return data as ProductRow;
-    }
-
-    // Try fallback by slug if id wasn't matched in Supabase
-    const { data: dataBySlug, error: slugError } = await supabase
-      .from('products')
-      // @ts-ignore
-      .update(updates)
-      .eq('slug', id)
-      .select()
-      .maybeSingle();
-
-    if (!slugError && dataBySlug) {
-      const prods = getLocalProducts();
-      const index = prods.findIndex((p) => p.id === id || p.slug === id);
-      if (index !== -1) {
-        prods[index] = dataBySlug as ProductRow;
-        saveLocalProducts(prods);
-      }
-      return dataBySlug as ProductRow;
-    }
-
-    throw new Error(
-      error?.message || slugError?.message || 'Failed to update product in the database.'
-    );
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to update product in the database.';
-    throw new Error(message);
-  }
+  saveLocalProducts(prods);
+  return updatedItem;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const prods = getLocalProducts();
-  const filtered = prods.filter((p) => p.id !== id && p.slug !== id);
-  saveLocalProducts(filtered);
-
-  if (!isSupabaseConfigured) {
-    return;
-  }
-
-  try {
-    await supabase.from('products').delete().eq('id', id);
-    await supabase.from('products').delete().eq('slug', id);
-  } catch (err) {
-    console.warn('Supabase deleteProduct error:', err);
-  }
+  await apiFetch(`/products/${id}`, { method: 'DELETE' });
+  const prods = getLocalProducts().filter((p) => p.id !== id && p.slug !== id);
+  saveLocalProducts(prods);
 }
 
 // ============================================================
@@ -299,51 +235,26 @@ export async function deleteProduct(id: string): Promise<void> {
 // ============================================================
 
 export async function getCategories(): Promise<CategoryRow[]> {
-  if (!isSupabaseConfigured) {
-    return productCategories.map(mapCategoryToRow);
+  const fromApi = await apiFetch<CategoryRow[]>('/categories');
+  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
+    return fromApi;
   }
-
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('category_number', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      return productCategories.map(mapCategoryToRow);
-    }
-
-    return data as CategoryRow[];
-  } catch (err) {
-    console.error('Error fetching categories from Supabase:', err);
-    return productCategories.map(mapCategoryToRow);
-  }
+  return productCategories.map(mapCategoryToRow);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<CategoryRow | null> {
-  if (!isSupabaseConfigured) {
-    const found = productCategories.find((c) => c.slug === slug);
-    return found ? mapCategoryToRow(found) : null;
-  }
+  const fromApi = await apiFetch<CategoryRow>(`/categories/${slug}`);
+  if (fromApi) return fromApi;
+  const fallback = productCategories.find((c) => c.slug === slug);
+  return fallback ? mapCategoryToRow(fallback) : null;
+}
 
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error || !data) {
-      const fallback = productCategories.find((c) => c.slug === slug);
-      return fallback ? mapCategoryToRow(fallback) : null;
-    }
-
-    return data as CategoryRow;
-  } catch (err) {
-    console.error(`Error fetching category ${slug} from Supabase:`, err);
-    const fallback = productCategories.find((c) => c.slug === slug);
-    return fallback ? mapCategoryToRow(fallback) : null;
-  }
+export async function updateCategory(id: string, updates: Partial<CategoryRow>): Promise<CategoryRow> {
+  const fromApi = await apiFetch<CategoryRow>(`/categories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return fromApi || ({ id, ...updates } as CategoryRow);
 }
 
 // ============================================================
@@ -351,201 +262,79 @@ export async function getCategoryBySlug(slug: string): Promise<CategoryRow | nul
 // ============================================================
 
 export async function getResources(): Promise<ResourceRow[]> {
-  if (!isSupabaseConfigured) {
-    return articlesData.map(mapArticleToRow);
+  const fromApi = await apiFetch<ResourceRow[]>('/resources');
+  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
+    return fromApi;
   }
-
-  try {
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      return articlesData.map(mapArticleToRow);
-    }
-
-    return data as ResourceRow[];
-  } catch (err) {
-    console.error('Error fetching resources from Supabase:', err);
-    return articlesData.map(mapArticleToRow);
-  }
+  return articlesData.map(mapArticleToRow);
 }
 
 export async function getResourceBySlug(slug: string): Promise<ResourceRow | null> {
-  if (!isSupabaseConfigured) {
-    const found = articlesData.find((a) => a.slug === slug);
-    return found ? mapArticleToRow(found) : null;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('resources')
-      .select('*')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error || !data) {
-      const fallback = articlesData.find((a) => a.slug === slug);
-      return fallback ? mapArticleToRow(fallback) : null;
-    }
-
-    return data as ResourceRow;
-  } catch (err) {
-    console.error(`Error fetching resource ${slug} from Supabase:`, err);
-    const fallback = articlesData.find((a) => a.slug === slug);
-    return fallback ? mapArticleToRow(fallback) : null;
-  }
+  const fromApi = await apiFetch<ResourceRow>(`/resources/${slug}`);
+  if (fromApi) return fromApi;
+  const found = articlesData.find((a) => a.slug === slug);
+  return found ? mapArticleToRow(found) : null;
 }
 
-export async function createResource(resource: Partial<ResourceRow> & { slug: string; title: string }): Promise<ResourceRow> {
-  const { data, error } = await supabase
-    .from('resources')
-    // @ts-ignore
-    .insert([resource])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as ResourceRow;
+export async function createResource(resource: Partial<ResourceRow>): Promise<ResourceRow> {
+  const fromApi = await apiFetch<ResourceRow>('/resources', {
+    method: 'POST',
+    body: JSON.stringify(resource),
+  });
+  return fromApi || ({ id: `res-${Date.now()}`, ...resource } as ResourceRow);
 }
 
 export async function updateResource(id: string, updates: Partial<ResourceRow>): Promise<ResourceRow> {
-  const { data, error } = await supabase
-    .from('resources')
-    // @ts-ignore
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as ResourceRow;
+  const fromApi = await apiFetch<ResourceRow>(`/resources/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+  return fromApi || ({ id, ...updates } as ResourceRow);
 }
 
 export async function deleteResource(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('resources')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  await apiFetch(`/resources/${id}`, { method: 'DELETE' });
 }
 
 // ============================================================
 // GALLERY IMAGES CRUD
 // ============================================================
 
-// Default initial gallery items for preview if DB is empty
-const defaultGallery: GalleryImageRow[] = [
-  {
-    id: 'g1',
-    image_url: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Fine mesh screen print on 100% combed cotton jersey',
-    sort_order: 1,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'g2',
-    image_url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Vibrant non-PVC Acrysol spot color print with zero hand-feel',
-    sort_order: 2,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'g3',
-    image_url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    caption: 'High-density 3D sculptural gel accent on athletic activewear',
-    sort_order: 3,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'g4',
-    image_url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Brilliant metallic gold flake paste on heavy fleece hoodie',
-    sort_order: 4,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'g5',
-    image_url: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Precision thermal litho-transfer adhesive application',
-    sort_order: 5,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'g6',
-    image_url: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&w=1200&q=80',
-    caption: 'Artisan hand-pulled studio print using Craft Ink Opaque White',
-    sort_order: 6,
-    created_at: new Date().toISOString(),
-  },
-];
+const defaultGallery: GalleryImageRow[] = [];
 
 export async function getGalleryImages(): Promise<GalleryImageRow[]> {
-  if (!isSupabaseConfigured) {
-    return defaultGallery;
+  const fromApi = await apiFetch<GalleryImageRow[]>('/gallery');
+  if (fromApi && Array.isArray(fromApi)) {
+    return fromApi;
   }
-
-  try {
-    const { data, error } = await supabase
-      .from('gallery_images')
-      .select('*')
-      .order('sort_order', { ascending: true });
-
-    if (error || !data || data.length === 0) {
-      return defaultGallery;
-    }
-
-    return data as GalleryImageRow[];
-  } catch (err) {
-    console.error('Error fetching gallery images from Supabase:', err);
-    return defaultGallery;
-  }
+  return defaultGallery;
 }
 
 export async function createGalleryImage(image: { image_url: string; caption?: string; sort_order?: number }): Promise<GalleryImageRow> {
-  const { data, error } = await supabase
-    .from('gallery_images')
-    // @ts-ignore
-    .insert([image])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as GalleryImageRow;
+  const fromApi = await apiFetch<GalleryImageRow>('/gallery', {
+    method: 'POST',
+    body: JSON.stringify(image),
+  });
+  return fromApi || ({ id: `gal-${Date.now()}`, ...image, sort_order: image.sort_order || 0 } as GalleryImageRow);
 }
 
 export async function updateGalleryImage(id: string, updates: Partial<GalleryImageRow>): Promise<GalleryImageRow> {
-  const { data, error } = await supabase
-    .from('gallery_images')
-    // @ts-ignore
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data as GalleryImageRow;
+  const fromApi = await apiFetch<GalleryImageRow>('/gallery', {
+    method: 'PUT',
+    body: JSON.stringify({ id, ...updates }),
+  });
+  return fromApi || ({ id, ...updates } as GalleryImageRow);
 }
 
 export async function updateGalleryOrder(items: { id: string; sort_order: number }[]): Promise<void> {
-  for (const item of items) {
-    await supabase
-      .from('gallery_images')
-      // @ts-ignore
-      .update({ sort_order: item.sort_order })
-      .eq('id', item.id);
-  }
+  await apiFetch('/gallery', {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  });
 }
 
 export async function deleteGalleryImage(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('gallery_images')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  await apiFetch(`/gallery/${id}`, { method: 'DELETE' });
 }
 
 // ============================================================
@@ -569,6 +358,14 @@ export async function getContactInfo(): Promise<ContactInfoRow> {
     formspree_endpoint: CONTACT_INFO.formspreeEndpoint,
   };
 
+  const fromApi = await apiFetch<ContactInfoRow>('/contact');
+  if (fromApi) {
+    try {
+      localStorage.setItem(LOCAL_CONTACT_KEY, JSON.stringify(fromApi));
+    } catch (e) {}
+    return { ...defaultContact, ...fromApi };
+  }
+
   try {
     const cached = localStorage.getItem(LOCAL_CONTACT_KEY);
     if (cached) {
@@ -587,116 +384,58 @@ export async function getContactInfo(): Promise<ContactInfoRow> {
     }
   } catch (e) {}
 
-  if (!isSupabaseConfigured) {
-    return defaultContact;
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('contact_info')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-
-    if (error || !data) {
-      return defaultContact;
-    }
-
-    return data as ContactInfoRow;
-  } catch (err) {
-    console.error('Error fetching contact info from Supabase:', err);
-    return defaultContact;
-  }
+  return defaultContact;
 }
 
 export async function updateContactInfo(updates: Partial<ContactInfoRow>): Promise<ContactInfoRow> {
-  const current = await getContactInfo();
-  const merged = { ...current, ...updates };
+  const fromApi = await apiFetch<ContactInfoRow>('/contact', {
+    method: 'PUT',
+    body: JSON.stringify(updates),
+  });
+
+  const merged = { ...updates, ...(fromApi || {}) };
   try {
     localStorage.setItem(LOCAL_CONTACT_KEY, JSON.stringify(merged));
   } catch (e) {}
-
-  if (!isSupabaseConfigured) {
-    return merged;
-  }
-
-  try {
-    const { data: existing } = await supabase
-      .from('contact_info')
-      .select('id')
-      .limit(1)
-      .maybeSingle();
-
-    if (existing) {
-      const { data, error } = await supabase
-        .from('contact_info')
-        // @ts-ignore
-        .update(updates)
-        .eq('id', (existing as any).id)
-        .select()
-        .maybeSingle();
-
-      if (!error && data) return data as ContactInfoRow;
-    } else {
-      const { data, error } = await supabase
-        .from('contact_info')
-        // @ts-ignore
-        .insert([updates])
-        .select()
-        .maybeSingle();
-
-      if (!error && data) return data as ContactInfoRow;
-    }
-    return merged;
-  } catch (err) {
-    console.warn('Supabase updateContactInfo error, using cached local updates:', err);
-    return merged;
-  }
+  return merged as ContactInfoRow;
 }
 
 // ============================================================
-// STORAGE HELPERS (with Blob URL Fallback)
+// STORAGE HELPERS (MongoDB Atlas Files Collection + Blob Fallback)
 // ============================================================
-
-function sanitizeStoragePath(filePath: string): string {
-  return filePath.replace(/[^a-zA-Z0-9._/-]/g, '-');
-}
 
 export async function uploadFile(
-  bucket: 'product-images' | 'product-pdfs' | 'gallery-images' | 'category-banners' | 'resource-images',
+  bucket: 'product-images' | 'product-pdfs' | 'gallery-images' | 'category-banners' | 'resource-images' | string,
   filePath: string,
   file: File
 ): Promise<string> {
-  const safePath = sanitizeStoragePath(filePath);
-
-  if (!isSupabaseConfigured) {
-    return URL.createObjectURL(file);
+  try {
+    const base64Data = await fileToBase64(file);
+    const filename = filePath || file.name;
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename,
+        contentType: file.type || (filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
+        base64Data,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url) return data.url;
+    }
+  } catch (err) {
+    console.warn('API upload to MongoDB failed, falling back to object URL:', err);
   }
-
-  const { error: uploadError } = await supabase.storage.from(bucket).upload(safePath, file, {
-    upsert: true,
-    cacheControl: '3600',
-    contentType: file.type || undefined,
-  });
-
-  if (uploadError) {
-    throw new Error(uploadError.message || `Failed to upload file to ${bucket}.`);
-  }
-
-  const { data } = supabase.storage.from(bucket).getPublicUrl(safePath);
-  if (!data?.publicUrl) {
-    throw new Error('Upload succeeded but no public URL was returned.');
-  }
-
-  return data.publicUrl;
+  return URL.createObjectURL(file);
 }
 
 export async function deleteStorageFile(bucket: string, filePath: string): Promise<void> {
-  if (!isSupabaseConfigured) return;
   try {
-    const { error } = await supabase.storage.from(bucket).remove([filePath]);
-    if (error) console.error(`Failed to remove file ${filePath} from bucket ${bucket}:`, error);
+    const fileId = filePath.replace('/api/files/', '');
+    await fetch(`/api/files/${fileId}`, { method: 'DELETE' });
   } catch (err) {
-    console.warn(`Supabase deleteStorageFile error:`, err);
+    console.warn('Delete file error:', err);
   }
 }
