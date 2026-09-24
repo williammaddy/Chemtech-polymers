@@ -33,7 +33,17 @@ export const CategoryPage: React.FC = () => {
       });
       getProducts().then((all) => {
         if (mounted && all) {
-          const matching = all.filter((p: any) => p.category_slug === categorySlug || p.categorySlug === categorySlug);
+          const normTarget = categorySlug.toLowerCase();
+          const matching = all.filter((p: any) => {
+            const pCat = (p.category_slug || p.categorySlug || '').toLowerCase();
+            return (
+              pCat === normTarget ||
+              (normTarget === 'non-pvc-acrysol' && pCat === 'non-pvc-inks') ||
+              (normTarget === 'specialty-inks' && (pCat === 'speciality-inks' || pCat === 'specialty')) ||
+              (normTarget === 'heat-transfer' && (pCat === 'heat-transfer-solutions' || pCat === 'heat-transfer')) ||
+              (normTarget === 'craft-ink' && (pCat === 'craft-inks' || pCat === 'craft-ink'))
+            );
+          });
           if (matching.length > 0) setProducts(matching);
         }
       });
@@ -137,7 +147,7 @@ export const CategoryPage: React.FC = () => {
                 key={product.slug}
                 className="product-card-visual"
                 style={{
-                  borderTop: `4px solid ${product.accentColor}`,
+                  borderTop: `4px solid ${product.accentColor || product.accent_color || 'var(--color-primary)'}`,
                   backgroundColor: '#FFFFFF',
                   borderRadius: 'var(--radius-lg)',
                   border: '1px solid var(--border-subtle)',

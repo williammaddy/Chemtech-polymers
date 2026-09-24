@@ -15,6 +15,18 @@ import {
   FileText
 } from 'lucide-react';
 
+function matchCategory(prodCat?: string, catSlug?: string): boolean {
+  if (!prodCat || !catSlug) return false;
+  const p = prodCat.toLowerCase();
+  const c = catSlug.toLowerCase();
+  if (p === c) return true;
+  if ((c === 'non-pvc-acrysol' || c === 'non-pvc-inks') && (p === 'non-pvc-acrysol' || p === 'non-pvc-inks')) return true;
+  if ((c === 'specialty-inks' || c === 'speciality-inks') && (p === 'specialty-inks' || p === 'speciality-inks' || p === 'specialty')) return true;
+  if ((c === 'heat-transfer' || c === 'heat-transfer-solutions') && (p === 'heat-transfer' || p === 'heat-transfer-solutions')) return true;
+  if ((c === 'craft-ink' || c === 'craft-inks') && (p === 'craft-ink' || p === 'craft-inks')) return true;
+  return false;
+}
+
 export const ProductsPage: React.FC = () => {
   const [categories, setCategories] = useState<any[]>(productCategories);
   const [products, setProducts] = useState<any[]>(productsData);
@@ -48,7 +60,7 @@ export const ProductsPage: React.FC = () => {
         const matchCat = cat.name.toLowerCase().includes(query) || (cat.description && cat.description.toLowerCase().includes(query));
         const matchProd = products.some(
           (p) =>
-            (p.categorySlug === cat.slug || p.category_slug === cat.slug) &&
+            matchCategory(p.categorySlug || p.category_slug, cat.slug) &&
             (p.name.toLowerCase().includes(query) || (p.code && p.code.toLowerCase().includes(query)))
         );
         return matchCat || matchProd;
@@ -235,11 +247,11 @@ export const ProductsPage: React.FC = () => {
                     {/* Products Preview Chips */}
                     <div style={{ marginBottom: '24px' }}>
                       <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                        Formulations in this series ({products.filter((p) => (p.categorySlug === cat.slug || p.category_slug === cat.slug)).length}):
+                        Formulations in this series ({products.filter((p) => matchCategory(p.categorySlug || p.category_slug, cat.slug)).length}):
                       </div>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {products
-                          .filter((p) => p.categorySlug === cat.slug || p.category_slug === cat.slug)
+                          .filter((p) => matchCategory(p.categorySlug || p.category_slug, cat.slug))
                           .map((prod) => (
                             <Link
                               key={prod.slug}

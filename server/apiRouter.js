@@ -41,15 +41,30 @@ apiRouter.post('/products', async (req, res) => {
   try {
     const db = await getDb();
     const product = req.body;
-    if (!product.name || !product.slug) {
-      return res.status(400).json({ error: 'Name and slug are required' });
+    if (!product.name) {
+      return res.status(400).json({ error: 'Product name is required' });
     }
+    const cleanSlug = product.slug || product.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const newDoc = {
       ...product,
+      slug: cleanSlug,
       id: product.id || `prod-${Date.now()}`,
       created_at: product.created_at || new Date().toISOString()
     };
     delete newDoc._id;
+
+    // If product with that id or slug already exists, update it
+    const existing = await db.collection('products').findOne({
+      $or: [{ id: newDoc.id }, { slug: newDoc.slug }]
+    });
+
+    if (existing) {
+      await db.collection('products').updateOne(
+        { _id: existing._id },
+        { $set: newDoc }
+      );
+      return res.json(newDoc);
+    }
 
     await db.collection('products').insertOne(newDoc);
     const { _id, ...saved } = newDoc;

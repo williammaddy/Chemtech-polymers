@@ -32,6 +32,7 @@ export const supabase = {
 
 // Helper to call MongoDB Atlas backend API with error safety
 async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T | null> {
+  const isMutation = Boolean(options?.method && options.method.toUpperCase() !== 'GET');
   try {
     const res = await fetch(`/api${endpoint}`, {
       headers: {
@@ -45,8 +46,11 @@ async function apiFetch<T>(endpoint: string, options?: RequestInit): Promise<T |
       throw new Error(err.error || `HTTP ${res.status}`);
     }
     return await res.json();
-  } catch (err) {
-    console.warn(`API call /api${endpoint} failed, falling back to local storage:`, err);
+  } catch (err: any) {
+    console.warn(`API call /api${endpoint} failed:`, err);
+    if (isMutation) {
+      throw err;
+    }
     return null;
   }
 }
@@ -173,9 +177,10 @@ export async function getProductBySlug(slug: string): Promise<ProductRow | null>
 }
 
 export async function createProduct(product: Partial<ProductRow> & { id: string; slug: string; name: string; category_slug: string }): Promise<ProductRow> {
+  const cleanSlug = product.slug || product.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   const newRow: ProductRow = {
     id: product.id || `prod-${Date.now()}`,
-    slug: product.slug,
+    slug: cleanSlug,
     name: product.name,
     category_slug: product.category_slug,
     code: product.code || '',
@@ -195,7 +200,7 @@ export async function createProduct(product: Partial<ProductRow> & { id: string;
 
   const fromApi = await apiFetch<ProductRow>('/products', {
     method: 'POST',
-    body: JSON.stringify(product),
+    body: JSON.stringify(newRow),
   });
 
   const prods = getLocalProducts();
