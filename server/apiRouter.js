@@ -71,7 +71,7 @@ apiRouter.post('/products', async (req, res) => {
     res.status(201).json(saved);
   } catch (err) {
     console.error('Error creating product:', err);
-    res.status(500).json({ error: 'Failed to create product in MongoDB' });
+    res.status(500).json({ error: `Failed to create product in MongoDB: ${err?.message || err}` });
   }
 });
 
