@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getProducts, updateProduct, uploadFile, isSupabaseConfigured } from '../../lib/supabase';
+import { getProducts, updateProduct, uploadFile } from '../../lib/supabase';
 import type { ProductRow } from '../../types/database';
 import {
   FileText,
@@ -15,7 +15,7 @@ import {
   FileX,
 } from 'lucide-react';
 
-const MAX_PDF_SIZE_BYTES = 20 * 1024 * 1024;
+const MAX_PDF_SIZE_BYTES = 14 * 1024 * 1024;
 
 function isBlobUrl(url: string): boolean {
   return url.startsWith('blob:');
@@ -48,11 +48,16 @@ export const ProductDocManagementPage: React.FC = () => {
   }, []);
 
   const persistPdfUrl = async (product: ProductRow, pdfUrl: string) => {
-    if (isSupabaseConfigured && isBlobUrl(pdfUrl)) {
-      throw new Error('PDF upload did not return a public URL. Check that the product-pdfs storage bucket exists.');
+    if (isBlobUrl(pdfUrl)) {
+      throw new Error('PDF upload did not return a public URL. Try again or paste a PDF link.');
     }
 
-    await updateProduct(product.id, { pdf_url: pdfUrl });
+    const saved = await updateProduct(product.id || product.slug, { pdf_url: pdfUrl });
+    const stored = saved.pdf_url || '';
+    if (stored !== pdfUrl) {
+      throw new Error('PDF was uploaded but the product record did not save the link. Try Save URL.');
+    }
+    return saved;
   };
 
   const handlePdfUpload = async (product: ProductRow, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,7 +72,7 @@ export const ProductDocManagementPage: React.FC = () => {
     }
 
     if (file.size > MAX_PDF_SIZE_BYTES) {
-      setStatusMessage({ type: 'error', text: 'PDF must be 20MB or smaller.' });
+      setStatusMessage({ type: 'error', text: 'PDF must be 14MB or smaller.' });
       inputElement.value = '';
       return;
     }
@@ -142,7 +147,7 @@ export const ProductDocManagementPage: React.FC = () => {
 
     setSavingId(product.id);
     try {
-      await updateProduct(product.id, { pdf_url: null });
+      await updateProduct(product.id || product.slug, { pdf_url: null });
       setPdfUrlDrafts((prev) => ({ ...prev, [product.id]: '' }));
       setStatusMessage({ type: 'success', text: `PDF removed from "${product.name}".` });
       await loadProducts(false);

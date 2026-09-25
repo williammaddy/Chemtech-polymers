@@ -2,6 +2,7 @@ import type { Database, ProductRow, CategoryRow, ResourceRow, GalleryImageRow, C
 import { productsData, productCategories, Product } from '../data/productsData';
 import { articlesData } from '../data/articlesData';
 import { CONTACT_INFO } from '../config/contactInfo';
+import { presentProduct, presentCategory, presentResource, presentContact } from './content';
 
 // MongoDB Atlas is the active database
 export const isDatabaseConnected = true;
@@ -162,18 +163,22 @@ function saveLocalProducts(products: ProductRow[]) {
 
 export async function getProducts(): Promise<ProductRow[]> {
   const fromApi = await apiFetch<ProductRow[]>('/products');
-  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
-    saveLocalProducts(fromApi);
-    return fromApi;
+  if (Array.isArray(fromApi)) {
+    const normalized = fromApi.map(presentProduct);
+    saveLocalProducts(normalized);
+    return normalized;
   }
-  return getLocalProducts();
+  return getLocalProducts().map(presentProduct);
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductRow | null> {
   const fromApi = await apiFetch<ProductRow>(`/products/${slug}`);
-  if (fromApi) return fromApi;
+  if (fromApi && (fromApi.slug || fromApi.id || fromApi.name)) {
+    return presentProduct(fromApi);
+  }
   const local = getLocalProducts();
-  return local.find((p) => p.slug === slug || p.id === slug) || null;
+  const found = local.find((p) => p.slug === slug || p.id === slug) || null;
+  return found ? presentProduct(found) : null;
 }
 
 export async function createProduct(product: Partial<ProductRow> & { id: string; slug: string; name: string; category_slug: string }): Promise<ProductRow> {
@@ -203,23 +208,30 @@ export async function createProduct(product: Partial<ProductRow> & { id: string;
     body: JSON.stringify(newRow),
   });
 
-  const prods = getLocalProducts();
-  const saved = fromApi || newRow;
+  if (!fromApi) {
+    throw new Error('Failed to create product in the database.');
+  }
+
+  const saved = presentProduct(fromApi);
+  const prods = getLocalProducts().filter((p) => p.id !== saved.id && p.slug !== saved.slug);
   prods.unshift(saved);
   saveLocalProducts(prods);
   return saved;
 }
 
 export async function updateProduct(id: string, updates: Partial<ProductRow>): Promise<ProductRow> {
-  const fromApi = await apiFetch<ProductRow>(`/products/${id}`, {
+  const fromApi = await apiFetch<ProductRow>(`/products/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
 
-  const prods = getLocalProducts();
-  const index = prods.findIndex((p) => p.id === id || p.slug === id);
-  const updatedItem = fromApi || (index !== -1 ? { ...prods[index], ...updates } : ({ id, ...updates } as ProductRow));
+  if (!fromApi) {
+    throw new Error('Failed to update product in the database.');
+  }
 
+  const updatedItem = presentProduct(fromApi);
+  const prods = getLocalProducts();
+  const index = prods.findIndex((p) => p.id === id || p.slug === id || p.id === updatedItem.id || p.slug === updatedItem.slug);
   if (index !== -1) {
     prods[index] = updatedItem;
   } else {
@@ -241,25 +253,30 @@ export async function deleteProduct(id: string): Promise<void> {
 
 export async function getCategories(): Promise<CategoryRow[]> {
   const fromApi = await apiFetch<CategoryRow[]>('/categories');
-  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
-    return fromApi;
+  if (Array.isArray(fromApi)) {
+    return fromApi.map(presentCategory);
   }
-  return productCategories.map(mapCategoryToRow);
+  return productCategories.map(mapCategoryToRow).map(presentCategory);
 }
 
 export async function getCategoryBySlug(slug: string): Promise<CategoryRow | null> {
-  const fromApi = await apiFetch<CategoryRow>(`/categories/${slug}`);
-  if (fromApi) return fromApi;
+  const fromApi = await apiFetch<CategoryRow>(`/categories/${encodeURIComponent(slug)}`);
+  if (fromApi && (fromApi.slug || fromApi.name)) {
+    return presentCategory(fromApi);
+  }
   const fallback = productCategories.find((c) => c.slug === slug);
-  return fallback ? mapCategoryToRow(fallback) : null;
+  return fallback ? presentCategory(mapCategoryToRow(fallback)) : null;
 }
 
 export async function updateCategory(id: string, updates: Partial<CategoryRow>): Promise<CategoryRow> {
-  const fromApi = await apiFetch<CategoryRow>(`/categories/${id}`, {
+  const fromApi = await apiFetch<CategoryRow>(`/categories/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
-  return fromApi || ({ id, ...updates } as CategoryRow);
+  if (!fromApi) {
+    throw new Error('Failed to update category in the database.');
+  }
+  return presentCategory(fromApi);
 }
 
 // ============================================================
@@ -268,17 +285,19 @@ export async function updateCategory(id: string, updates: Partial<CategoryRow>):
 
 export async function getResources(): Promise<ResourceRow[]> {
   const fromApi = await apiFetch<ResourceRow[]>('/resources');
-  if (fromApi && Array.isArray(fromApi) && fromApi.length > 0) {
-    return fromApi;
+  if (Array.isArray(fromApi)) {
+    return fromApi.map(presentResource);
   }
-  return articlesData.map(mapArticleToRow);
+  return articlesData.map(mapArticleToRow).map(presentResource);
 }
 
 export async function getResourceBySlug(slug: string): Promise<ResourceRow | null> {
-  const fromApi = await apiFetch<ResourceRow>(`/resources/${slug}`);
-  if (fromApi) return fromApi;
+  const fromApi = await apiFetch<ResourceRow>(`/resources/${encodeURIComponent(slug)}`);
+  if (fromApi && (fromApi.slug || fromApi.title)) {
+    return presentResource(fromApi);
+  }
   const found = articlesData.find((a) => a.slug === slug);
-  return found ? mapArticleToRow(found) : null;
+  return found ? presentResource(mapArticleToRow(found)) : null;
 }
 
 export async function createResource(resource: Partial<ResourceRow>): Promise<ResourceRow> {
@@ -286,15 +305,21 @@ export async function createResource(resource: Partial<ResourceRow>): Promise<Re
     method: 'POST',
     body: JSON.stringify(resource),
   });
-  return fromApi || ({ id: `res-${Date.now()}`, ...resource } as ResourceRow);
+  if (!fromApi) {
+    throw new Error('Failed to create resource in the database.');
+  }
+  return presentResource(fromApi);
 }
 
 export async function updateResource(id: string, updates: Partial<ResourceRow>): Promise<ResourceRow> {
-  const fromApi = await apiFetch<ResourceRow>(`/resources/${id}`, {
+  const fromApi = await apiFetch<ResourceRow>(`/resources/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   });
-  return fromApi || ({ id, ...updates } as ResourceRow);
+  if (!fromApi) {
+    throw new Error('Failed to update resource in the database.');
+  }
+  return presentResource(fromApi);
 }
 
 export async function deleteResource(id: string): Promise<void> {
@@ -320,7 +345,10 @@ export async function createGalleryImage(image: { image_url: string; caption?: s
     method: 'POST',
     body: JSON.stringify(image),
   });
-  return fromApi || ({ id: `gal-${Date.now()}`, ...image, sort_order: image.sort_order || 0 } as GalleryImageRow);
+  if (!fromApi) {
+    throw new Error('Failed to create gallery image in the database.');
+  }
+  return fromApi;
 }
 
 export async function updateGalleryImage(id: string, updates: Partial<GalleryImageRow>): Promise<GalleryImageRow> {
@@ -328,7 +356,10 @@ export async function updateGalleryImage(id: string, updates: Partial<GalleryIma
     method: 'PUT',
     body: JSON.stringify({ id, ...updates }),
   });
-  return fromApi || ({ id, ...updates } as GalleryImageRow);
+  if (!fromApi) {
+    throw new Error('Failed to update gallery image in the database.');
+  }
+  return fromApi;
 }
 
 export async function updateGalleryOrder(items: { id: string; sort_order: number }[]): Promise<void> {
@@ -365,10 +396,11 @@ export async function getContactInfo(): Promise<ContactInfoRow> {
 
   const fromApi = await apiFetch<ContactInfoRow>('/contact');
   if (fromApi) {
+    const merged = presentContact(fromApi, defaultContact);
     try {
-      localStorage.setItem(LOCAL_CONTACT_KEY, JSON.stringify(fromApi));
+      localStorage.setItem(LOCAL_CONTACT_KEY, JSON.stringify(merged));
     } catch (e) {}
-    return { ...defaultContact, ...fromApi };
+    return merged as ContactInfoRow;
   }
 
   try {
@@ -398,7 +430,11 @@ export async function updateContactInfo(updates: Partial<ContactInfoRow>): Promi
     body: JSON.stringify(updates),
   });
 
-  const merged = { ...updates, ...(fromApi || {}) };
+  if (!fromApi) {
+    throw new Error('Failed to update contact information in the database.');
+  }
+
+  const merged = presentContact(fromApi, updates);
   try {
     localStorage.setItem(LOCAL_CONTACT_KEY, JSON.stringify(merged));
   } catch (e) {}
@@ -414,26 +450,26 @@ export async function uploadFile(
   filePath: string,
   file: File
 ): Promise<string> {
-  try {
-    const base64Data = await fileToBase64(file);
-    const filename = filePath || file.name;
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filename,
-        contentType: file.type || (filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
-        base64Data,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.url) return data.url;
-    }
-  } catch (err) {
-    console.warn('API upload to MongoDB failed, falling back to object URL:', err);
+  const base64Data = await fileToBase64(file);
+  const filename = filePath || file.name;
+  const res = await fetch('/api/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename,
+      contentType: file.type || (filename.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream'),
+      base64Data,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.url) {
+    throw new Error(data.error || `Failed to upload file (${res.status}).`);
   }
-  return URL.createObjectURL(file);
+  if (typeof data.url === 'string' && data.url.startsWith('blob:')) {
+    throw new Error('Upload did not return a public file URL.');
+  }
+  return data.url;
 }
 
 export async function deleteStorageFile(bucket: string, filePath: string): Promise<void> {

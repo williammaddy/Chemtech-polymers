@@ -29,3 +29,4 @@ dist/
 .env
 .env.*
 assets/videos/*.mp4
+public/uploads/*

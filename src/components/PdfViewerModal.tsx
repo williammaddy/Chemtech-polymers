@@ -71,7 +71,7 @@ export const PdfViewerModal: React.FC<PdfViewerModalProps> = ({
 
   if (!product) return null;
 
-  const pdfPath = product.pdfUrl || `/assets/pdfs/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-tds.pdf`;
+  const pdfPath = product.pdfUrl || (product as any).pdf_url || `/assets/pdfs/${product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-tds.pdf`;
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {

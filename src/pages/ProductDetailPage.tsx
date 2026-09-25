@@ -11,6 +11,7 @@ import {
   getCategoryBySlug,
   getContactInfo
 } from '../lib/supabase';
+import { getProductPdfUrl } from '../lib/content';
 import {
   Download,
   Package,
@@ -117,7 +118,7 @@ export const ProductDetailPage: React.FC = () => {
   const productName = product.name;
   const productCode = product.code || (product.slug ? product.slug.toUpperCase() : '');
   const productImage = product.image || product.image_url || '';
-  const productPdf = product.pdfUrl || product.pdf_url || `/assets/pdfs/${product.slug}.pdf`;
+  const productPdf = getProductPdfUrl(product);
   const productTagline = product.tagline || '';
   const productDesc = product.longDesc || product.description || product.shortDesc || '';
   const productFeatures: string[] = Array.isArray(product.features)

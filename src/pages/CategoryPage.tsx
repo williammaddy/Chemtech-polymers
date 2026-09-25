@@ -3,6 +3,7 @@ import { useParams, Link, Navigate, useNavigate } from 'react-router-dom';
 import { Breadcrumbs } from '../components/Breadcrumbs';
 import { getCategoryBySlug as getStaticCategory, getProductsByCategory as getStaticProducts, productCategories } from '../data/productsData';
 import { getCategoryBySlug, getProducts } from '../lib/supabase';
+import { getProductPdfUrl } from '../lib/content';
 import {
   ArrowRight,
   FileText,
@@ -259,8 +260,10 @@ export const CategoryPage: React.FC = () => {
                   {/* Action Buttons: Download PDF and View Details */}
                   <div style={{ display: 'flex', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
                     <a
-                      href={product.pdfUrl || product.pdf_url || `/assets/pdfs/${product.slug}.pdf`}
+                      href={getProductPdfUrl(product)}
                       download={`${product.code}-TDS.pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="btn btn-outline btn-sm"
                       style={{ flex: 1, justifyContent: 'center', textDecoration: 'none' }}
                     >

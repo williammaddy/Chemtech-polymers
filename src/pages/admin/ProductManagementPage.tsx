@@ -211,7 +211,7 @@ export const ProductManagementPage: React.FC = () => {
       };
 
       if (editingProduct) {
-        await updateProduct(editingProduct.id, payload);
+        await updateProduct(editingProduct.id || editingProduct.slug, payload);
         setStatusMessage({ type: 'success', text: `Product "${payload.name}" updated successfully!` });
       } else {
         await createProduct(payload as any);

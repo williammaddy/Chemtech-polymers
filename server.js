@@ -13,6 +13,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // API routes powered by MongoDB Atlas
 app.use('/api', apiRouter);
 
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
 // Serve static frontend build
 app.use(express.static(path.join(__dirname, 'dist')));
 app.get('*', (req, res) => {

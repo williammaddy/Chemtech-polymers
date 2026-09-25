@@ -118,24 +118,8 @@ export const App: React.FC = () => {
             <Route path="*" element={<Navigate to="/admin-secure-login/dashboard" replace />} />
           </Route>
 
-          {/* Protected Admin Control Center aliases under /admin */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <AdminLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="dashboard" element={<ProductManagementPage />} />
-            <Route path="products" element={<ProductManagementPage />} />
-            <Route path="documents" element={<ProductDocManagementPage />} />
-            <Route path="product-docs" element={<ProductDocManagementPage />} />
-            <Route path="gallery" element={<GalleryManagementPage />} />
-            <Route path="resources" element={<ResourceManagementPage />} />
-            <Route path="contact" element={<ContactManagementPage />} />
-            <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
-          </Route>
+          {/* Redirect /admin/* (except /admin and /admin/login) to /admin-secure-login/* */}
+          <Route path="/admin/*" element={<Navigate to="/admin-secure-login/*" replace />} />
 
           {/* Global Fallback Route */}
           <Route path="*" element={<Navigate to="/" replace />} />

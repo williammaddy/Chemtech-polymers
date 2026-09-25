@@ -163,7 +163,7 @@ export const ResourceManagementPage: React.FC = () => {
       };
 
       if (editingResource) {
-        await updateResource(editingResource.id, payload);
+        await updateResource(editingResource.id || editingResource.slug, payload);
         setStatusMessage({ type: 'success', text: `Resource "${payload.title}" updated!` });
       } else {
         await createResource(payload);
