@@ -431,7 +431,7 @@ apiRouter.get('/contact', async (req, res) => {
         whatsapp_number: "918248212154",
         map_embed_url: "",
         hours: "Monday – Saturday: 9:00 AM – 6:30 PM IST",
-        formspree_endpoint: "https://formspree.io/f/mvkojeyd",
+        formspree_endpoint: "https://formspree.io/f/xjykanvj",
       };
       await db.collection('contact_info').insertOne(contact);
     }

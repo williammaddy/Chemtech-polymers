@@ -604,7 +604,7 @@ const initialContactInfo = {
   whatsapp_number: "918248212154",
   map_embed_url: "",
   hours: "Monday – Saturday: 9:00 AM – 6:30 PM IST",
-  formspree_endpoint: "https://formspree.io/f/mvkojeyd",
+  formspree_endpoint: "https://formspree.io/f/xjykanvj",
   updated_at: new Date().toISOString()
 };
 

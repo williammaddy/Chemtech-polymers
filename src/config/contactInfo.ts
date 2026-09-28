@@ -2,7 +2,7 @@
  * Update these values here to change contact details site-wide — no other files need to be touched.
  */
 export const CONTACT_INFO = {
-  formspreeEndpoint: "https://formspree.io/f/mvkojeyd",
+  formspreeEndpoint: "https://formspree.io/f/xjykanvj",
   whatsappNumber: "918248212154",
   callMeBotApiKey: "YOUR_CALLMEBOT_API_KEY", // replace once obtained
   phone: "+91 93635 19955 / +91 82208 04830",        // business phone numbers

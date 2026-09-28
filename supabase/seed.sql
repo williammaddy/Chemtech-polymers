@@ -71,7 +71,7 @@ VALUES (
   '918248212154',
   '',
   'Monday – Saturday: 9:00 AM – 6:30 PM IST',
-  'https://formspree.io/f/mvkojeyd'
+  'https://formspree.io/f/xjykanvj'
 )
 ON CONFLICT (id) DO UPDATE SET
   phone = EXCLUDED.phone,

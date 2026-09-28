@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS public.contact_info (
   whatsapp_number TEXT,
   map_embed_url TEXT,
   hours TEXT,
-  formspree_endpoint TEXT DEFAULT 'https://formspree.io/f/mvkojeyd',
+  formspree_endpoint TEXT DEFAULT 'https://formspree.io/f/xjykanvj',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
